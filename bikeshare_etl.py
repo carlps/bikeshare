@@ -15,6 +15,7 @@ import requests
 import hashlib
 import sqlite3
 
+db = 'bikeshare.db'
 
 def get_data(file):
 	'''
@@ -84,6 +85,9 @@ def add_hash_to_data(data):
 	#TODO make sure each dict has the same keys (ie not no key if null)
 	sorted_keys = sorted(data['data'][0].keys())
 
+	#don't want last_updated included in md5 so remove from list
+	sorted_keys.remove('last_updated')
+
 	#empty dict to store concatenated strings
 	concat_dict = {}
 
@@ -103,10 +107,15 @@ def add_hash_to_data(data):
 	#return data
 
 
-def validate_data(source_row, target_row):
+def compare_data(table_name):
 	'''
 	hash downloaded data, and compare with data in db
 	'''
+	#first get target data for comparison
+	connection = sqlite3.connect(db)
+	sql = 'SELECT * FROM {}'.format(table_name)
+	target_data = connection.execut(sql).fetchall()\
+
 	return None
 
 def unpack_data(data):
@@ -130,10 +139,11 @@ def load_system_regions(data):
 	since each has different structure
 	'''
 	unpacked = unpack_data(data)
-	connection = sqlite3.connect('bikeshare.db')
+	connection = sqlite3.connect(db)
 	sql = 'INSERT INTO {} VALUES(?,?,?,?)'.format(data['name'])
 	connection.executemany(sql,unpacked)
 	connection.commit()
+	connection.close()
 
 def load_data(data):
 	'''
