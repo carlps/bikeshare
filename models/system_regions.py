@@ -4,14 +4,27 @@ import hashlib
 
 class System_Region():
 
-	def __init__(self,last_udpated,region_id,name,region_md5):
-		self.last_udpated = last_udpated
-		self.region_id = region_id
-		self.name = name
-		if region_md5 ==- None:
-			self.region_md5 = get_region_md5()
-		else:
-			self.region_md5 = region_md5
+	def __init__(self,record):
+		'''
+		record should be a dict with the following keys:
+		last_updated, region_id, name
+
+		region_md5 is calculated using the hashlib md5
+
+		self.listed is a list in the following order:
+		last_updated, region_id, name, region_md5
+		used to to insert into db
+
+		self.type should be in all models to ensure source/tgt is correct
+		'''
+		self.last_updated = record['last_updated']
+		self.region_id = record['region_id']
+		self.name = record['name']
+		self.region_md5 = self.get_region_md5()
+
+		self.listed = [self.last_updated, self.region_id, 
+					   self.name, self.region_md5]
+
 
 	def __repr__(self):
 		return '<name {}>'.format(self.name)
