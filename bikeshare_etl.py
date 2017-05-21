@@ -82,6 +82,48 @@ def compare_data(table_name, md5_col):
 
 	return None
 
+def remove_duplicate_md5(data,table_name):
+	'''
+	lookup md5 in table. if exists, remove from data
+	'''
+	#empty list for md5s
+	md5s = []
+
+	#hardcoding params due to table_name. maybe better way?
+	if table_name == 'system_regions':
+		row_id = 'region_id'
+		md5_col = 'region_md5'
+		for row in data:
+			md5s.append(row.region_md5)
+	elif table_name == 'station_information':
+		row_id = 'station_id'
+		md5_col = 'station_md5'
+		for row in data:
+			md5s.append(row.station_md5)
+	else:
+		print('only works for system regions and station information. \
+			   did you mess something up')
+		return None
+
+	#create sql statement	
+	sql = 'SELECT {0} FROM {1} WHERE {2} = ?'.format(row_id,table_name,md5_col)
+
+	#connect
+	connection = sqlite3.connect(db)
+
+	lkps = []
+	for md5 in md5s:
+		#lookup md5
+		lkp_db = c.execute(sql,(md5,)).fetchall()
+		#lkp will be list of tuples (or empty list if no match)
+		#so, for tuple in list
+		for lkp in lkp_db:
+			#append values in lkp to list
+			lkps += lkp
+
+	#TODO remove lkps from data
+
+	connection.close()
 
 def load_data(data, table_name):
 	'''
@@ -115,6 +157,7 @@ def main():
 	regions_list = []
 	for region in regions:
 		regions_list.append(System_Region(region))
+	remove_duplicate_md5(regions_list)
 	load_data(regions_list,'system_regions')
 
 if __name__ == '__main__':
