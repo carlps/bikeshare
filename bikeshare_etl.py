@@ -107,14 +107,16 @@ def add_hash_to_data(data):
 	#return data
 
 
-def compare_data(table_name):
+def compare_data(table_name, md5_col):
 	'''
-	hash downloaded data, and compare with data in db
+	check if md5 of new row exists in db
+	if yes, remove from data since we don't
+	want to care about duplicates
 	'''
 	#first get target data for comparison
 	connection = sqlite3.connect(db)
-	sql = 'SELECT * FROM {}'.format(table_name)
-	target_data = connection.execut(sql).fetchall()\
+	sql = 'SELECT {0} FROM {1} WHERE {0} = ?'.format(md5_col,table_name)
+	target_data = connection.execute(sql).fetchall()
 
 	return None
 

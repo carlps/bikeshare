@@ -1,6 +1,8 @@
 TODO
 
-Classes.
+Classes. AKA Models.
+-- probably should just send data into model
+-- and do all unpacking + MD5 in there.
 
 system_regions
 station_status
