@@ -68,20 +68,6 @@ def get_data(file):
 	#return dict
 	return data
 
-
-def compare_data(table_name, md5_col):
-	'''
-	check if md5 of new row exists in db
-	if yes, remove from data since we don't
-	want to care about duplicates
-	'''
-	#first get target data for comparison
-	connection = sqlite3.connect(db)
-	sql = 'SELECT {0} FROM {1} WHERE {0} = ?'.format(md5_col,table_name)
-	target_data = connection.execute(sql).fetchall()
-
-	return None
-
 def remove_duplicate_md5(data,table_name):
 	'''
 	lookup md5 in table. if exists, remove from data
@@ -114,27 +100,33 @@ def remove_duplicate_md5(data,table_name):
 	lkps = []
 	for md5 in md5s:
 		#lookup md5
-		lkp_db = c.execute(sql,(md5,)).fetchall()
+		lkp_db = connection.execute(sql,(md5,)).fetchall()
 		#lkp will be list of tuples (or empty list if no match)
 		#so, for tuple in list
 		for lkp in lkp_db:
 			#append values in lkp to list
 			lkps += lkp
 
-	#TODO remove lkps from data
-
 	connection.close()
+
+	#again, probably a better way to do this, but for now this works
+	if table_name == 'system_regions':
+		#return only rows that are not in lkp
+		return [row for row in data if int(row.region_id) not in lkps]
+	elif table_name == 'station_information':
+		#return only rows that are not in lkp
+		return [row for row in data if int(row.station_id) not in lkps]
 
 def load_data(data, table_name):
 	'''
 	load data into db
-	data should be list of objects with attribute obj.listed
+	data should be list of objects with attribute obj.as_list
 	which should be a list of the data in correct order for loading
 	'''
 	#1st need list of lists instead of list of objs
 	records_list = []
 	for row in data:
-		records_list.append(row.listed)
+		records_list.append(row.as_list)
 
 	#create SQL statement. 
 	#since different data has different amount of cols, leave statement open
@@ -157,7 +149,8 @@ def main():
 	regions_list = []
 	for region in regions:
 		regions_list.append(System_Region(region))
-	remove_duplicate_md5(regions_list)
+
+	regions_list = remove_duplicate_md5(regions_list, 'system_regions')
 	load_data(regions_list,'system_regions')
 
 if __name__ == '__main__':

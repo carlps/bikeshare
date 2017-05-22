@@ -22,8 +22,9 @@ class System_Region():
 		self.name = record['name']
 		self.region_md5 = self.get_region_md5()
 
-		self.listed = [self.last_updated, self.region_id, 
+		self.as_list = [self.last_updated, self.region_id, 
 					   self.name, self.region_md5]
+
 
 
 	def __repr__(self):
