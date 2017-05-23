@@ -68,54 +68,62 @@ def get_data(file):
 	#return dict
 	return data
 
-def remove_duplicate_md5(data,table_name):
+def compare_data(data,table_name):
 	'''
 	lookup md5 in table. if exists, remove from data
 	'''
 	#empty list for md5s
-	md5s = []
+	row_ids = []
 
 	#hardcoding params due to table_name. maybe better way?
 	if table_name == 'system_regions':
 		row_id = 'region_id'
 		md5_col = 'region_md5'
 		for row in data:
-			md5s.append(row.region_md5)
+			row_ids.append(row.region_id)
 	elif table_name == 'station_information':
 		row_id = 'station_id'
 		md5_col = 'station_md5'
 		for row in data:
-			md5s.append(row.station_md5)
+			row_ids.append(row.station_id)
 	else:
 		print('only works for system regions and station information. \
 			   did you mess something up')
 		return None
 
-	#create sql statement	
-	sql = 'SELECT {0} FROM {1} WHERE {2} = ?'.format(row_id,table_name,md5_col)
+	#create sql statement
+	#since unknown number of parms will be passed, leave open
+	sql = 'SELECT {0}, {1} FROM {2} WHERE {0} IN (?'.format(
+			row_id,md5_col,table_name)
+	#calculate how many ?s to add for parms
+	parms = ',?' * (len(row_ids)-1) + ')'
+	sql += parms
 
 	#connect
 	connection = sqlite3.connect(db)
 
-	lkps = []
-	for md5 in md5s:
-		#lookup md5
-		lkp_db = connection.execute(sql,(md5,)).fetchall()
-		#lkp will be list of tuples (or empty list if no match)
-		#so, for tuple in list
-		for lkp in lkp_db:
-			#append values in lkp to list
-			lkps += lkp
+	#get all ids and md5s with matching ids
+	lkps = connection.execute(sql,row_ids).fetchall()
+	#convert list of sets to dict
+	lkps_dict = {lkp[0]:lkp[1] for lkp in lkps}
 
 	connection.close()
 
 	#again, probably a better way to do this, but for now this works
 	if table_name == 'system_regions':
-		#return only rows that are not in lkp
-		return [row for row in data if int(row.region_id) not in lkps]
+		#if id is not in lkps_dict, then it is a brand new record
+		inserts = [data.pop(data.index(row)) for row in data if row.region_id not in lkps_dict]
+		#if md5s don't match, then the record has been updated
+		updates = [data.pop(data.index(row)) for row in data if row.region_md5 !=lkps_dict[row.region_id]]
+		
 	elif table_name == 'station_information':
-		#return only rows that are not in lkp
-		return [row for row in data if int(row.station_id) not in lkps]
+		#if id is not in lkps_dict, then it is a brand new record
+		inserts = [data.pop(data.index(row)) for row in data if row.station_id not in lkps_dict]
+		#if md5s don't match, then the record has been updated
+		updates = [data.pop(data.index(row)) for row in data if row.station_md5 !=lkps_dict[row.station_id]]
+
+	return({'inserts':inserts,'updates':updates})
+
 
 def load_data(data, table_name):
 	'''
@@ -150,8 +158,8 @@ def main():
 	for region in regions:
 		regions_list.append(System_Region(region))
 
-	regions_list = remove_duplicate_md5(regions_list, 'system_regions')
-	load_data(regions_list,'system_regions')
+	upserts = compare_data(regions_list, 'system_regions')
+	#load_data(regions_list,'system_regions')
 
 if __name__ == '__main__':
 	main()

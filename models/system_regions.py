@@ -18,7 +18,8 @@ class System_Region():
 		self.type should be in all models to ensure source/tgt is correct
 		'''
 		self.last_updated = record['last_updated']
-		self.region_id = record['region_id']
+		#convert region_id to int
+		self.region_id = int(record['region_id'])
 		self.name = record['name']
 		self.region_md5 = self.get_region_md5()
 

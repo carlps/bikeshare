@@ -8,9 +8,11 @@ system_regions
 station_status
 station_information
 
+sqlalchemy?
 
 --should I add a transtype?
 --would require checking deletes.
 --probably worth it.
 --more clear, less inference.
 --can also try with a branch?
+
