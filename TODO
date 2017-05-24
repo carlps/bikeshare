@@ -15,4 +15,4 @@ sqlalchemy?
 --probably worth it.
 --more clear, less inference.
 --can also try with a branch?
-
+--doing it in branch transtype
