@@ -11,6 +11,7 @@ create_system_regions = '''CREATE TABLE system_regions
 							 region_id INTEGER,
 							 name TEXT,
 							 region_md5 TEXT,
+							 transtype TEXT,
 							 PRIMARY KEY(last_updated, region_id)
 							)'''
 
@@ -33,6 +34,7 @@ create_station_information = '''CREATE TABLE station_information
 								 rental_method_ACCOUNTNUMBER INTEGER,
 								 rental_method_PHONE INTEGER,
 								 station_md5 TEXT,
+							 	 transtype TEXT,
 								 FOREIGN KEY(region_id) REFERENCES system_regions(region_id),
 								 PRIMARY KEY(last_updated, station_id)
 								 )'''
