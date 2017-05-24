@@ -128,13 +128,15 @@ def compare_data(data,table_name):
 def load_data(data, table_name):
 	'''
 	load data into db
-	data should be list of objects with attribute obj.as_list
+	data should be dict of list of objects with attribute obj.as_list
 	which should be a list of the data in correct order for loading
+
+	dict keys can be 'inserts' or 'updates'
 	'''
-	#1st need list of lists instead of list of objs
-	records_list = []
-	for row in data:
-		records_list.append(row.as_list)
+	
+	#get inserts and add 'I' to end for transtype
+	records_list = [record.as_list + ['I'] for record in data['inserts']]
+	records_list += [record.as_list + ['U'] for record in data['updates']]
 
 	#create SQL statement. 
 	#since different data has different amount of cols, leave statement open
@@ -159,7 +161,7 @@ def main():
 		regions_list.append(System_Region(region))
 
 	upserts = compare_data(regions_list, 'system_regions')
-	#load_data(regions_list,'system_regions')
+	load_data(upserts,'system_regions')
 
 if __name__ == '__main__':
 	main()

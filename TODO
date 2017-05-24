@@ -11,8 +11,5 @@ station_information
 sqlalchemy?
 
 --should I add a transtype?
---would require checking deletes.
---probably worth it.
---more clear, less inference.
---can also try with a branch?
 --doing it in branch transtype
+--need latest_row_indicator
