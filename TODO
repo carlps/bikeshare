@@ -13,3 +13,5 @@ sqlalchemy?
 --should I add a transtype?
 --doing it in branch transtype
 --need latest_row_indicator
+--and view for latest non-deleted
+--need to check for and flag Deletes

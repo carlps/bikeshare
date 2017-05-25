@@ -108,6 +108,11 @@ def compare_data(data,table_name):
 	lkps_dict = {lkp[0]:lkp[1] for lkp in lkps}
 
 	connection.close()
+	
+	#################
+	###### TODO #####
+	# check deletes #
+	#################
 
 	#again, probably a better way to do this, but for now this works
 	if table_name == 'system_regions':

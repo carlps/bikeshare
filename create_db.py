@@ -3,7 +3,7 @@ create sqlite db to store bikeshare data
 will eventually move to cloud
 '''
 import sqlite3
-
+from create_views import create_system_regions_view, create_station_information_view
 
 
 create_system_regions = '''CREATE TABLE system_regions
@@ -12,6 +12,7 @@ create_system_regions = '''CREATE TABLE system_regions
 							 name TEXT,
 							 region_md5 TEXT,
 							 transtype TEXT,
+							 latest_row_ind TEXT,
 							 PRIMARY KEY(last_updated, region_id)
 							)'''
 
@@ -27,7 +28,7 @@ create_station_information = '''CREATE TABLE station_information
 								 eightd_has_ley_dispenser REAL,
 								 rental_method_KEY INTEGER,
 								 rental_method_CREDITCARD INTEGER,
-								 rental_method_PAYPASS INTEGER
+								 rental_method_PAYPASS INTEGER,
 								 rental_method_APPLEPAY INTEGER,
 								 rental_method_ANDROIDPAY INTEGER,
 								 rental_method_TRANSITCARD INTEGER,
@@ -35,6 +36,7 @@ create_station_information = '''CREATE TABLE station_information
 								 rental_method_PHONE INTEGER,
 								 station_md5 TEXT,
 							 	 transtype TEXT,
+							 	 latest_row_ind TEXT,
 								 FOREIGN KEY(region_id) REFERENCES system_regions(region_id),
 								 PRIMARY KEY(last_updated, station_id)
 								 )'''
@@ -55,10 +57,13 @@ create_station_status = '''CREATE TABLE station_status
 							)'''
 
 def main():
-	connection = sqlite3.connect('bikeshare.db')
+	db = 'bikeshare.db'
+	connection = sqlite3.connect(db)
 	connection.execute(create_system_regions)
 	connection.execute(create_station_information)
 	connection.execute(create_station_status)
+	connection.execute(create_system_regions_view)
+	connection.execute(create_station_information_view)
 	connection.commit()
 	connection.close()
 

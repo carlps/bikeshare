@@ -17,11 +17,11 @@ def get_new_data(table_name, old_db):
 	old_data = c.execute(sql).fetchall()
 
 	#add 'I' to the end for new data
-	new_data = [row + ('I',) for row in old_data]
+	new_data = [row + ('Y',) for row in old_data]
 
 	c.close()
 
-	return new_data
+	return old_data
 
 def insert_new_data(data,table_name,db):
 	
