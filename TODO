@@ -12,6 +12,10 @@ sqlalchemy?
 
 --should I add a transtype?
 --doing it in branch transtype
---need latest_row_indicator
---and view for latest non-deleted
---need to check for and flag Deletes
+x-need latest_row_indicator
+x-and view for latest non-deleted
+!-need to check for and flag Deletes
+!-also need to update olds to N
+    --either get old md5 or use key/last_updated?
+
+python 3.6?

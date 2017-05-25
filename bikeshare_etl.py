@@ -91,21 +91,32 @@ def compare_data(data,table_name):
 			   did you mess something up')
 		return None
 
-	#create sql statement
+	#view contains latest, non-deleted data
+	view_name = 'v_{}'.format(table_name)
+
+	#create sql statement for inserts/updates
 	#since unknown number of parms will be passed, leave open
-	sql = 'SELECT {0}, {1} FROM {2} WHERE {0} IN (?'.format(
-			row_id,md5_col,table_name)
+	iu_sql = 'SELECT {0}, {1} FROM {2} WHERE {0} IN (?'.format(
+			row_id,md5_col,view_name)
 	#calculate how many ?s to add for parms
 	parms = ',?' * (len(row_ids)-1) + ')'
-	sql += parms
+	iu_sql += parms
+
+	#delete statement is inverse of insert/update statement
+	#except we want entire record to insert a copy
+	d_sql = 'SELECT * FROM {1} WHERE {0} NOT IN (?'.format(
+			row_id,view_name)+parms
 
 	#connect
 	connection = sqlite3.connect(db)
 
 	#get all ids and md5s with matching ids
-	lkps = connection.execute(sql,row_ids).fetchall()
+	matches = connection.execute(iu_sql,row_ids).fetchall()
 	#convert list of sets to dict
-	lkps_dict = {lkp[0]:lkp[1] for lkp in lkps}
+	matches_dict = {match[0]:match[1] for match in matches}
+
+	#get all ids and md5s for 
+	deletes = connection.execute(d_sql,row_ids).fetchall()
 
 	connection.close()
 	
@@ -116,18 +127,44 @@ def compare_data(data,table_name):
 
 	#again, probably a better way to do this, but for now this works
 	if table_name == 'system_regions':
-		#if id is not in lkps_dict, then it is a brand new record
-		inserts = [data.pop(data.index(row)) for row in data if row.region_id not in lkps_dict]
+		#if id is not in matches_dict, then it is a brand new record
+		inserts = [data.pop(data.index(row)) for row in data if row.region_id not in matches_dict]
 		#if md5s don't match, then the record has been updated
-		updates = [data.pop(data.index(row)) for row in data if row.region_md5 !=lkps_dict[row.region_id]]
+		updates = [data.pop(data.index(row)) for row in data if row.region_md5 !=matches_dict[row.region_id]]
 		
 	elif table_name == 'station_information':
-		#if id is not in lkps_dict, then it is a brand new record
-		inserts = [data.pop(data.index(row)) for row in data if row.station_id not in lkps_dict]
+		#if id is not in matches_dict, then it is a brand new record
+		inserts = [data.pop(data.index(row)) for row in data if row.station_id not in matches_dict]
 		#if md5s don't match, then the record has been updated
-		updates = [data.pop(data.index(row)) for row in data if row.station_md5 !=lkps_dict[row.station_id]]
+		updates = [data.pop(data.index(row)) for row in data if row.station_md5 !=matches_dict[row.station_id]]
 
-	return({'inserts':inserts,'updates':updates})
+	return({'inserts':inserts,'updates':updates,'deletes':deletes})
+
+def update_old(data,table_name):
+	'''
+	before inserting records that are U or D
+	update the old version to set latest_row_ind = 'N'
+	'''
+
+	#hardcoding params due to table_name. maybe better way?
+	if table_name == 'system_regions':
+		md5_col = 'region_md5'
+	elif table_name == 'station_information':
+		md5_col = 'station_md5'
+	else:
+		print('only works for system regions and station information. \
+			   did you mess something up')
+		return None
+
+
+	#use md5 to update
+	sql = "UPDATE {0} SET latest_row_ind = 'N' WHERE {1} = (?)".format(
+			table_name,md5_col)
+
+	#################################################
+	## if using md5, need to get old md5 from data ##
+	#################################################
+
 
 
 def load_data(data, table_name):
@@ -165,8 +202,9 @@ def main():
 	for region in regions:
 		regions_list.append(System_Region(region))
 
-	upserts = compare_data(regions_list, 'system_regions')
-	load_data(upserts,'system_regions')
+	data = compare_data(regions_list, 'system_regions')
+	update_old(data,'system_regions')
+	load_data(data,'system_regions')
 
 if __name__ == '__main__':
 	main()
