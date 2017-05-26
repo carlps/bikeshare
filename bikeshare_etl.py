@@ -94,6 +94,9 @@ def compare_data(data,table_name):
 	#view contains latest, non-deleted data
 	view_name = 'v_{}'.format(table_name)
 
+	#pull last_updated from a row to use for deletes
+	last_updated = data[0].last_updated
+
 	#create sql statement for inserts/updates
 	#since unknown number of parms will be passed, leave open
 	iu_sql = 'SELECT {0}, {1} FROM {2} WHERE {0} IN (?'.format(
@@ -115,30 +118,42 @@ def compare_data(data,table_name):
 	#convert list of sets to dict
 	matches_dict = {match[0]:match[1] for match in matches}
 
-	#get all ids and md5s for 
+	#we want whole records for deletes so we can insert D
 	deletes = connection.execute(d_sql,row_ids).fetchall()
 
 	connection.close()
 	
-	#################
-	###### TODO #####
-	# check deletes #
-	#################
+	#need to update delete timestamp
+	deletes = [(last_updated,)+row[1:] for row in deletes]
+	
 
 	#again, probably a better way to do this, but for now this works
 	if table_name == 'system_regions':
 		#if id is not in matches_dict, then it is a brand new record
-		inserts = [data.pop(data.index(row)) for row in data if row.region_id not in matches_dict]
+		#need to pop out inserts first to prevent KeyError when looking for updates
+		inserts = [data.pop(data.index(row))\
+		 for row in data if row.region_id not in matches_dict]
+		
 		#if md5s don't match, then the record has been updated
+		#first get a copy of the pre-updated record to update in db to latest_row_ind = N
+		updates_old = [(row.region_id,matches_dict[row.region_id])\
+		 for row in data  if row.region_md5 != matches_dict[row.region_id]]
+		#then pop out whole mismatch record to insert as the latest, updated record
 		updates = [data.pop(data.index(row)) for row in data if row.region_md5 !=matches_dict[row.region_id]]
 		
 	elif table_name == 'station_information':
 		#if id is not in matches_dict, then it is a brand new record
+		#need to pop out inserts first to prevent KeyError when looking for updates
 		inserts = [data.pop(data.index(row)) for row in data if row.station_id not in matches_dict]
+		
 		#if md5s don't match, then the record has been updated
+		#first get a copy of the pre-updated record to update in db to latest_row_ind = N
+		updates_old = [(row.station_id,matches_dict[row.station_id])\
+		 for row in data  if row.station_md5 != matches_dict[row.station_id]]
+		#then pop out whole mismatch record to insert as the latest, updated record
 		updates = [data.pop(data.index(row)) for row in data if row.station_md5 !=matches_dict[row.station_id]]
 
-	return({'inserts':inserts,'updates':updates,'deletes':deletes})
+	return({'inserts':inserts,'updates':updates,'updates_old':updates_old,'deletes':deletes})
 
 def update_old(data,table_name):
 	'''
@@ -156,14 +171,18 @@ def update_old(data,table_name):
 			   did you mess something up')
 		return None
 
+	#get md5s from deletes and updates_old to update
+	md5s = [[rec[-1]] for rec in data['deletes']]
+	md5s += [[rec[-1]] for rec in data['updates_old']]
 
 	#use md5 to update
 	sql = "UPDATE {0} SET latest_row_ind = 'N' WHERE {1} = (?)".format(
 			table_name,md5_col)
 
-	#################################################
-	## if using md5, need to get old md5 from data ##
-	#################################################
+	connection = sqlite3.connect(db)
+	update = connection.executemany(sql,md5s)
+	connection.commit()
+	connection.close()
 
 
 
@@ -176,9 +195,13 @@ def load_data(data, table_name):
 	dict keys can be 'inserts' or 'updates'
 	'''
 	
-	#get inserts and add 'I' to end for transtype
-	records_list = [record.as_list + ['I'] for record in data['inserts']]
-	records_list += [record.as_list + ['U'] for record in data['updates']]
+	#get inserts and add 'I','Y' to end for transtype and latest_row_ind
+	records_list = [record.as_list + ['I','Y'] for record in data['inserts']]
+	#same but 'U' for updates
+	records_list += [record.as_list + ['U','Y'] for record in data['updates']]
+	#deletes are kinda different since they are not objects and have old date
+	records_list += [list(record) + ['D','Y'] for record in data['deletes']]
+
 
 	#create SQL statement. 
 	#since different data has different amount of cols, leave statement open

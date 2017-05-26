@@ -1,8 +1,10 @@
 TODO
 
 Classes. AKA Models.
--- probably should just send data into model
--- and do all unpacking + MD5 in there.
+x- probably should just send data into model
+x- and do all unpacking + MD5 in there.
+!- as_list should be class method instead of attr?
+    --it will save space and processing so yes.
 
 system_regions
 station_status
