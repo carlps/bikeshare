@@ -6,7 +6,7 @@ data from https://gbfs.capitalbikeshare.com/gbfs/gbfs.json
 The gbfs.json file lists what files are available for 
 consumption. 
 
-For now, we're just going to use station info and station status
+For now we're just going to use station info, station status and system regions
 
 For more details, check https://github.com/NABSA/gbfs/blob/master/gbfs.md
 '''
@@ -36,6 +36,7 @@ def get_data(file):
 	valid_files = ('station_information','station_status','system_regions')
 	if file not in valid_files:
 		print("invalid file name. should be one of:",valid_files)
+		#TODO - return None throws error. fix pls.
 		return None
 
 	#build url using param

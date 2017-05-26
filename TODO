@@ -3,21 +3,18 @@ TODO
 Classes. AKA Models.
 x- probably should just send data into model
 x- and do all unpacking + MD5 in there.
-!- as_list should be class method instead of attr?
+x- as_list should be class method instead of attr?
     --it will save space and processing so yes.
 
-system_regions
-station_status
-station_information
+datasets:
+x- system_regions
+-- station_information
+-- station_status
 
 sqlalchemy?
+--will do one after sqlite and compare
 
---should I add a transtype?
---doing it in branch transtype
-x-need latest_row_indicator
-x-and view for latest non-deleted
-!-need to check for and flag Deletes
-!-also need to update olds to N
-    --either get old md5 or use key/last_updated?
+station status might be better for mongodb?
+
 
 python 3.6?
