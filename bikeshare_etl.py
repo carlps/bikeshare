@@ -218,16 +218,24 @@ def load_data(data, table_name):
 
 	return None
 
+def etl(table_name):
+	'''
+	get data, transform, update old if needed,
+	insert new
+	'''
+	data = get_data(table_name)
+	if(table_name == 'system_regions'):
+		data_list = [System_Region(record) for record in data]
+	elif(table_name == 'station_information'):
+		data_list = [Station_Information(record) for record in data]
+	
+	data = compare_data(data_list, table_name)
+	update_old(data,table_name)
+	load_data(data,table_name)
 
 def main():
-	regions = get_data('system_regions')
-	regions_list = []
-	for region in regions:
-		regions_list.append(System_Region(region))
+	etl('system_regions')
 
-	data = compare_data(regions_list, 'system_regions')
-	update_old(data,'system_regions')
-	load_data(data,'system_regions')
 
 if __name__ == '__main__':
 	main()
