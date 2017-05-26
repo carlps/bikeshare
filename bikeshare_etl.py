@@ -189,16 +189,16 @@ def update_old(data,table_name):
 def load_data(data, table_name):
 	'''
 	load data into db
-	data should be dict of list of objects with attribute obj.as_list
+	data should be dict of list of objects with attribute obj.to_list()
 	which should be a list of the data in correct order for loading
 
 	dict keys can be 'inserts' or 'updates'
 	'''
 	
 	#get inserts and add 'I','Y' to end for transtype and latest_row_ind
-	records_list = [record.as_list + ['I','Y'] for record in data['inserts']]
+	records_list = [record.to_list() + ['I','Y'] for record in data['inserts']]
 	#same but 'U' for updates
-	records_list += [record.as_list + ['U','Y'] for record in data['updates']]
+	records_list += [record.to_list() + ['U','Y'] for record in data['updates']]
 	#deletes are kinda different since they are not objects and have old date
 	records_list += [list(record) + ['D','Y'] for record in data['deletes']]
 

@@ -23,9 +23,6 @@ class System_Region():
 		self.name = record['name']
 		self.region_md5 = self.get_region_md5()
 
-		self.as_list = [self.last_updated, self.region_id, 
-					   self.name, self.region_md5]
-
 
 
 	def __repr__(self):
@@ -33,3 +30,6 @@ class System_Region():
 
 	def get_region_md5(self):
 		return hashlib.md5(str.encode(str(self.region_id) + self.name)).hexdigest()
+
+	def to_list(self):
+		return [self.last_updated, self.region_id, self.name, self.region_md5]
