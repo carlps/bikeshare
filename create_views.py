@@ -24,7 +24,7 @@ create_station_information_view = '''CREATE VIEW v_station_information AS
 								lon,
 								capacity,
 								region_id,
-								eightd_has_ley_dispenser,
+								eightd_has_key_dispenser,
 								rental_method_KEY,
 								rental_method_CREDITCARD,
 								rental_method_PAYPASS

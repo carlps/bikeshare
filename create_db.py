@@ -25,7 +25,7 @@ create_station_information = '''CREATE TABLE station_information
 								 lon REAL,
 								 capacity INTEGER,
 								 region_id INTEGER,
-								 eightd_has_ley_dispenser REAL,
+								 eightd_has_key_dispenser REAL,
 								 rental_method_KEY INTEGER,
 								 rental_method_CREDITCARD INTEGER,
 								 rental_method_PAYPASS INTEGER,
