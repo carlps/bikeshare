@@ -11,6 +11,10 @@ x- system_regions
 -- station_information
 -- station_status
 
+!!! fix set_station_md5
+
+
+
 sqlalchemy?
 --will do one after sqlite and compare
 
@@ -18,3 +22,9 @@ station status might be better for mongodb?
 
 
 python 3.6?
+
+
+tests:
+-insert on empty db
+-compare IUD
+-empty file

@@ -16,6 +16,7 @@ import hashlib
 import sqlite3
 
 from models.system_regions import System_Region
+from models.station_information import Station_Information
 
 db = 'bikeshare.db'
 
@@ -71,22 +72,25 @@ def get_data(file):
 
 def compare_data(data,table_name):
 	'''
-	lookup md5 in table. if exists, remove from data
+	lookup the data in sql view
+	if db data exists in new data but doesn't match: update
+	if db data doesn't exist in new data: insert
+	if db data exists but not in new data: delete
+	if db data exists and matches: do nothing
+
+	if nothing in db data: insert all
 	'''
-	#empty list for md5s
-	row_ids = []
+
 
 	#hardcoding params due to table_name. maybe better way?
 	if table_name == 'system_regions':
 		row_id = 'region_id'
 		md5_col = 'region_md5'
-		for row in data:
-			row_ids.append(row.region_id)
+		row_ids = [row.region_id for row in data]
 	elif table_name == 'station_information':
 		row_id = 'station_id'
 		md5_col = 'station_md5'
-		for row in data:
-			row_ids.append(row.station_id)
+		row_ids = [row.station_id for row in data]
 	else:
 		print('only works for system regions and station information. \
 			   did you mess something up')
@@ -116,6 +120,11 @@ def compare_data(data,table_name):
 
 	#get all ids and md5s with matching ids
 	matches = connection.execute(iu_sql,row_ids).fetchall()
+
+	# quick check - if matches has 0, set all to inserts and return
+	if len(matches) == 0:
+		return {'inserts':data,'updates':[],'updates_old':[],'deletes':[]}
+
 	#convert list of sets to dict
 	matches_dict = {match[0]:match[1] for match in matches}
 
@@ -161,7 +170,11 @@ def update_old(data,table_name):
 	before inserting records that are U or D
 	update the old version to set latest_row_ind = 'N'
 	'''
-
+	#if no deletes or updates, nothing to do here
+	if len(data['deletes']+data['updates_old']) == 0:
+		print('no updates or deletes, jumping out')
+		return
+	print('updating old')
 	#hardcoding params due to table_name. maybe better way?
 	if table_name == 'system_regions':
 		md5_col = 'region_md5'
@@ -196,13 +209,17 @@ def load_data(data, table_name):
 	dict keys can be 'inserts' or 'updates'
 	'''
 	
+	#validate table_name
+	if table_name not in ('system_regions','station_information','station_status'):
+		print('invalid table name, bro')
+		return
+
 	#get inserts and add 'I','Y' to end for transtype and latest_row_ind
 	records_list = [record.to_list() + ['I','Y'] for record in data['inserts']]
 	#same but 'U' for updates
 	records_list += [record.to_list() + ['U','Y'] for record in data['updates']]
 	#deletes are kinda different since they are not objects and have old date
 	records_list += [list(record) + ['D','Y'] for record in data['deletes']]
-
 
 	#create SQL statement. 
 	#since different data has different amount of cols, leave statement open
@@ -217,7 +234,6 @@ def load_data(data, table_name):
 	connection.commit()
 	connection.close()
 
-	return None
 
 def etl(table_name):
 	'''
@@ -225,6 +241,7 @@ def etl(table_name):
 	insert new
 	'''
 	data = get_data(table_name)
+	print('extract done.')
 	if(table_name == 'system_regions'):
 		data_list = [System_Region(record) for record in data]
 	elif(table_name == 'station_information'):
@@ -232,10 +249,12 @@ def etl(table_name):
 	
 	data = compare_data(data_list, table_name)
 	update_old(data,table_name)
+	print('transform done.')
 	load_data(data,table_name)
+	print('load done.')
 
 def main():
-	etl('system_regions')
+	etl('station_information')
 
 
 if __name__ == '__main__':
