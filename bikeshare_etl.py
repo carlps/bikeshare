@@ -20,11 +20,11 @@ from models.station_information import Station_Information
 
 db = 'bikeshare.db'
 
-def get_data(file):
+def get_data(table_name):
 	'''
 	uses requests to lookup bikeshare data
-	file is one of the json data file names (no extension)
-	--file is also the name of the target table
+	table_name is one of the json data file names (no extension)
+	--table_name is also the name of the target table
 	(see https://github.com/NABSA/gbfs/blob/master/gbfs.md#files)
 	ex: 'system_information'
 
@@ -35,13 +35,13 @@ def get_data(file):
 
 	#first, validate proper param
 	valid_files = ('station_information','station_status','system_regions')
-	if file not in valid_files:
-		print("invalid file name. should be one of:",valid_files)
+	if table_name not in valid_files:
+		print("invalid table_name. should be one of:",valid_files)
 		#TODO - return None throws error. fix pls.
 		return None
 
 	#build url using param
-	url = 'https://gbfs.capitalbikeshare.com/gbfs/en/{}.json'.format(file)
+	url = 'https://gbfs.capitalbikeshare.com/gbfs/en/{}.json'.format(table_name)
 
 	#attempt to get url
 	response = requests.get(url)
@@ -67,7 +67,9 @@ def get_data(file):
 	#add last_updated to each row in data
 	for row in data:
 		row['last_updated'] = last_updated
-	#return dict
+
+	print(f'{table_name}: extract done. {len(data)} rows of data')
+	#return list
 	return data
 
 def compare_data(data,table_name):
@@ -123,6 +125,7 @@ def compare_data(data,table_name):
 
 	# quick check - if matches has 0, set all to inserts and return
 	if len(matches) == 0:
+		print(f'{table_name}: all new records. {len(data)} inserts')
 		return {'inserts':data,'updates':[],'updates_old':[],'deletes':[]}
 
 	#convert list of sets to dict
@@ -133,6 +136,7 @@ def compare_data(data,table_name):
 
 	connection.close()
 	
+	#prob should do if len(deletes) != 0
 	#need to update delete timestamp
 	deletes = [(last_updated,)+row[1:] for row in deletes]
 	
@@ -140,28 +144,37 @@ def compare_data(data,table_name):
 	#again, probably a better way to do this, but for now this works
 	if table_name == 'system_regions':
 		#if id is not in matches_dict, then it is a brand new record
-		#need to pop out inserts first to prevent KeyError when looking for updates
-		inserts = [data.pop(data.index(row))\
-		 for row in data if row.region_id not in matches_dict]
+		inserts = [data[data.index(row)] for row in data\
+					if row.region_id not in matches_dict]
+		#remove inserts from data list (necessary for updates)
+		data = [row for row in data if row not in inserts]
 		
 		#if md5s don't match, then the record has been updated
 		#first get a copy of the pre-updated record to update in db to latest_row_ind = N
-		updates_old = [(row.region_id,matches_dict[row.region_id])\
-		 for row in data  if row.region_md5 != matches_dict[row.region_id]]
-		#then pop out whole mismatch record to insert as the latest, updated record
-		updates = [data.pop(data.index(row)) for row in data if row.region_md5 !=matches_dict[row.region_id]]
+		updates_old = [(row.region_id,matches_dict[row.region_id])for row in data\
+						if row.region_md5 != matches_dict[row.region_id]]
+		#then get whole mismatch record to insert as the latest, updated record
+		updates = [data[data.index(row)] for row in data\
+					if row.region_md5 !=matches_dict[row.region_id]]
 		
 	elif table_name == 'station_information':
 		#if id is not in matches_dict, then it is a brand new record
-		#need to pop out inserts first to prevent KeyError when looking for updates
-		inserts = [data.pop(data.index(row)) for row in data if row.station_id not in matches_dict]
+		inserts = [data[data.index(row)] for row in data\
+					 if row.station_id not in matches_dict]
+		#remove inserts from data list (necessary for updates)
+		data = [row for row in data if row not in inserts]
+		
 		
 		#if md5s don't match, then the record has been updated
 		#first get a copy of the pre-updated record to update in db to latest_row_ind = N
-		updates_old = [(row.station_id,matches_dict[row.station_id])\
-		 for row in data  if row.station_md5 != matches_dict[row.station_id]]
-		#then pop out whole mismatch record to insert as the latest, updated record
-		updates = [data.pop(data.index(row)) for row in data if row.station_md5 !=matches_dict[row.station_id]]
+		updates_old = [(row.station_id,matches_dict[row.station_id]) for row in data\
+						if row.station_md5 != matches_dict[row.station_id]]
+		#then get whole mismatch record to insert as the latest, updated record
+		updates = [data[data.index(row)] for row in data\
+				 	if row.station_md5 !=matches_dict[row.station_id]]
+
+	print(f'{table_name}: compared data. {len(inserts)} inserts. ',
+		f'{len(updates)} updates. {len(deletes)} deletes.')
 
 	return({'inserts':inserts,'updates':updates,'updates_old':updates_old,'deletes':deletes})
 
@@ -172,9 +185,8 @@ def update_old(data,table_name):
 	'''
 	#if no deletes or updates, nothing to do here
 	if len(data['deletes']+data['updates_old']) == 0:
-		print('no updates or deletes, jumping out')
+		print('no updates or deletes')
 		return
-	print('updating old')
 	#hardcoding params due to table_name. maybe better way?
 	if table_name == 'system_regions':
 		md5_col = 'region_md5'
@@ -197,6 +209,8 @@ def update_old(data,table_name):
 	update = connection.executemany(sql,md5s)
 	connection.commit()
 	connection.close()
+
+	print(f'{table_name}: updated {len(md5s)} old records.')
 
 
 
@@ -234,6 +248,8 @@ def load_data(data, table_name):
 	connection.commit()
 	connection.close()
 
+	print(f'{table_name}: load done. loaded {len(records_list)} records')
+
 
 def etl(table_name):
 	'''
@@ -241,17 +257,17 @@ def etl(table_name):
 	insert new
 	'''
 	data = get_data(table_name)
-	print('extract done.')
 	if(table_name == 'system_regions'):
 		data_list = [System_Region(record) for record in data]
 	elif(table_name == 'station_information'):
 		data_list = [Station_Information(record) for record in data]
 	
 	data = compare_data(data_list, table_name)
+	if((len(data['inserts'])+len(data['updates'])+len(data['deletes'])) == 0):
+		print('no data to insert, update, or delete.')
+		return
 	update_old(data,table_name)
-	print('transform done.')
 	load_data(data,table_name)
-	print('load done.')
 
 def main():
 	etl('station_information')

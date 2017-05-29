@@ -110,18 +110,32 @@ class Station_Information():
 			self.rental_method_PHONE = False
 		
 	def set_station_md5(self):
+		'''
+		get string of attributes in predefined order
+		set station_md5 to md5 of string
+		'''
 
-		#############
-		### WRONG ###
-		###  FIX  ###
-		#############
-		self.station_md5 = hashlib.md5(str.encode(str(self.region_id)\
-										+ self.name)).hexdigest()
+		attr_string = str(self.station_id) + self.short_name +\
+					  self.name + str(self.lat) + str(self.lon) +\
+					  str(self.capacity) + str(self.region_id) + \
+					  str(self.eightd_has_key_dispenser) +\
+					  str(self.rental_method_KEY) +\
+					  str(self.rental_method_CREDITCARD) +\
+					  str(self.rental_method_PAYPASS) +\
+					  str(self.rental_method_APPLEPAY) +\
+					  str(self.rental_method_ANDROIDPAY) +\
+					  str(self.rental_method_TRANSITCARD) +\
+					  str(self.rental_method_ACCOUNTNUMBER) +\
+					  str(self.rental_method_PHONE)
+					  
+
+
+		self.station_md5 = hashlib.md5(str.encode(attr_string)).hexdigest()
 
 	def to_list(self):
 		'''
 		last_updated, station_id, short_name, name, lat, lon, 
-		capacity, region_id, eightd_has_ley_dispenser, rental_method_KEY, 
+		capacity, region_id, eightd_has_key_dispenser, rental_method_KEY, 
 		rental_method_CREDITCARD, rental_method_PAYPASS, 
 		rental_method_APPLEPAY, rental_method_ANDROIDPAY, 
 		rental_method_TRANSITCARD, rental_method_ACCOUNTNUMBER, 
