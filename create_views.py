@@ -27,7 +27,7 @@ create_station_information_view = '''CREATE VIEW v_station_information AS
 								eightd_has_key_dispenser,
 								rental_method_KEY,
 								rental_method_CREDITCARD,
-								rental_method_PAYPASS
+								rental_method_PAYPASS,
 								rental_method_APPLEPAY,
 								rental_method_ANDROIDPAY,
 								rental_method_TRANSITCARD,
@@ -41,6 +41,8 @@ create_station_information_view = '''CREATE VIEW v_station_information AS
 
 def main():
 	connection = sqlite3.connect('bikeshare.db')
+	connection.execute('DROP VIEW v_station_information')
+	connection.execute('DROP VIEW v_system_regions')
 	connection.execute(create_system_regions_view)
 	connection.execute(create_station_information_view)
 	connection.commit()
