@@ -272,6 +272,7 @@ def etl(table_name):
 
 def main():
 	etl('station_information')
+	etl('system_regions')
 
 
 if __name__ == '__main__':

@@ -24,10 +24,25 @@ sqlalchemy?
 station status might be better for mongodb?
 
 
-python 3.6?
+X-python 3.6?
 
+What happens when I, D, and then new? Probably a new I, right?
 
 tests:
 -insert on empty db
 -compare IUD
 -empty file
+-views are correct
+
+
+
+
+station_info
+1 - 888 should be D
+2 - 1 should be I
+3 - 100 should be U
+
+regions
+1 - 123 D
+2 - 42 U
+3 - 104 I
