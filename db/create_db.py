@@ -56,14 +56,26 @@ create_station_status = '''CREATE TABLE station_status
 							 PRIMARY KEY(last_updated, station_id)
 							)'''
 
+create_load_metadata = '''CREATE TABLE load_metadata
+							(last_updated_tstmp INTEGER,
+							 dataset TEXT,
+							 start_time INTEGER,
+							 end_time INTEGER,
+							 inserts INTEGER,
+							 updates INTEGER,
+							 deletes INTEGER,
+							 PRIMARY KEY(last_updated_tstmp, dataset)
+							)'''
+
 def main():
 	db = 'bikeshare.db'
 	connection = sqlite3.connect(db)
-	connection.execute(create_system_regions)
-	connection.execute(create_station_information)
-	connection.execute(create_station_status)
-	connection.execute(create_system_regions_view)
-	connection.execute(create_station_information_view)
+	#connection.execute(create_system_regions)
+	#connection.execute(create_station_information)
+	#connection.execute(create_station_status)
+	#connection.execute(create_system_regions_view)
+	#connection.execute(create_station_information_view)
+	connection.execute(create_load_metadata)
 	connection.commit()
 	connection.close()
 
