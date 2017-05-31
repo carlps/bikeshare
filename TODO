@@ -8,8 +8,8 @@ x- as_list should be class method instead of attr?
 
 datasets:
 x- system_regions
--- station_information
-    --test update/delete and should be good
+x- station_information
+    x-test update/delete and should be good
 -- station_status
 
 X fix set_station_md5

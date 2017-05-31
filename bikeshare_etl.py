@@ -218,9 +218,10 @@ def load_data(data, table_name):
 	'''
 	load data into db
 	data should be dict of list of objects with attribute obj.to_list()
+	or for deletes, just list of values
 	which should be a list of the data in correct order for loading
 
-	dict keys can be 'inserts' or 'updates'
+	dict keys can be 'inserts', 'updates', and/or 'deletes'
 	'''
 	
 	#validate table_name
