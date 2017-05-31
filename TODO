@@ -16,6 +16,7 @@ X fix set_station_md5
 
 !- control table
 !- unit tests
+!- rollback on error
 
 
 sqlalchemy?

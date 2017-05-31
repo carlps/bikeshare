@@ -14,19 +14,23 @@ For more details, check https://github.com/NABSA/gbfs/blob/master/gbfs.md
 import requests
 import hashlib
 import sqlite3
+import time
 
 from models.system_regions import System_Region
 from models.station_information import Station_Information
 
 db = 'bikeshare.db'
 
-def get_data(table_name):
+def get_data(table_name, metadata):
 	'''
 	uses requests to lookup bikeshare data
 	table_name is one of the json data file names (no extension)
 	--table_name is also the name of the target table
 	(see https://github.com/NABSA/gbfs/blob/master/gbfs.md#files)
 	ex: 'system_information'
+
+	metadata is a list with metadata that is updated throughout the process
+	in this function, the first slot in the list is given last_updated
 
 	returns list of dicts -- each dict contains the row data
 	last_updated is a unix timestamp stored as integer
@@ -69,10 +73,14 @@ def get_data(table_name):
 		row['last_updated'] = last_updated
 
 	print(f'{table_name}: extract done. {len(data)} rows of data')
+
+	#updated metadata
+	metadata[0] = last_updated
+
 	#return list
 	return data
 
-def compare_data(data,table_name):
+def compare_data(data,table_name, metadata):
 	'''
 	lookup the data in sql view
 	if db data exists in new data but doesn't match: update
@@ -173,6 +181,11 @@ def compare_data(data,table_name):
 		updates = [data[data.index(row)] for row in data\
 				 	if row.station_md5 !=matches_dict[row.station_id]]
 
+	# update metadata
+	metadata[4] = len(inserts)
+	metadata[5] = len(updates)
+	metadata[6] = len(deletes)
+
 	print(f'{table_name}: compared data. {len(inserts)} inserts. ',
 		f'{len(updates)} updates. {len(deletes)} deletes.')
 
@@ -214,7 +227,7 @@ def update_old(data,table_name):
 
 
 
-def load_data(data, table_name):
+def load_data(data, table_name, metadata):
 	'''
 	load data into db
 	data should be dict of list of objects with attribute obj.to_list()
@@ -243,13 +256,19 @@ def load_data(data, table_name):
 	parms = ',?' * (len(records_list[0])-1) + ')'
 	sql = sql_unfinished + parms
 
+	metadata_sql = 'INSERT INTO load_metadata VALUES(?,?,?,?,?,?,?)'
+
 	#connect
 	connection = sqlite3.connect(db)
 	connection.executemany(sql,records_list)
+	#update metadata with end time
+	metadata[3] = int(time.time())
+	connection.execute(metadata_sql,metadata)
 	connection.commit()
 	connection.close()
 
-	print(f'{table_name}: load done. loaded {len(records_list)} records')
+	print(f'{table_name}: load done. loaded {len(records_list)} records.'\
+		  f'\nsee table load_metadata, last_updated {metadata[0]} for details')
 
 
 def etl(table_name):
@@ -257,18 +276,21 @@ def etl(table_name):
 	get data, transform, update old if needed,
 	insert new
 	'''
-	data = get_data(table_name)
+	#instantiate metadata list and set dataset, start time
+	metadata = [0,table_name,int(time.time()),0,0,0,0]
+
+	data = get_data(table_name, metadata)
 	if(table_name == 'system_regions'):
 		data_list = [System_Region(record) for record in data]
 	elif(table_name == 'station_information'):
 		data_list = [Station_Information(record) for record in data]
 	
-	data = compare_data(data_list, table_name)
+	data = compare_data(data_list, table_name, metadata)
 	if((len(data['inserts'])+len(data['updates'])+len(data['deletes'])) == 0):
 		print('no data to insert, update, or delete.')
 		return
 	update_old(data,table_name)
-	load_data(data,table_name)
+	load_data(data,table_name, metadata)
 
 def main():
 	etl('station_information')
