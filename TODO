@@ -14,10 +14,15 @@ x- station_information
 
 X fix set_station_md5
 
-!- control table
+X- control table
+    !-change start/end to decimal
 !- unit tests
 !- rollback on error
 
+
+in models.__init__ can you make import * import *.*?
+    ex: instead of from models.system_regions import System_Region, etc
+        would rather just from models import *
 
 sqlalchemy?
 --will do one after sqlite and compare

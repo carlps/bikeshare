@@ -12,12 +12,12 @@ For more details, check https://github.com/NABSA/gbfs/blob/master/gbfs.md
 '''
 
 import requests
-import hashlib
 import sqlite3
 import time
 
 from models.system_regions import System_Region
 from models.station_information import Station_Information
+from models.station_status import Station_Status
 
 db = 'bikeshare.db'
 
@@ -41,8 +41,7 @@ def get_data(table_name, metadata):
 	valid_files = ('station_information','station_status','system_regions')
 	if table_name not in valid_files:
 		print("invalid table_name. should be one of:",valid_files)
-		#TODO - return None throws error. fix pls.
-		return None
+		return
 
 	#build url using param
 	url = 'https://gbfs.capitalbikeshare.com/gbfs/en/{}.json'.format(table_name)
@@ -226,7 +225,6 @@ def update_old(data,table_name):
 	print(f'{table_name}: updated {len(md5s)} old records.')
 
 
-
 def load_data(data, table_name, metadata):
 	'''
 	load data into db
@@ -241,13 +239,19 @@ def load_data(data, table_name, metadata):
 	if table_name not in ('system_regions','station_information','station_status'):
 		print('invalid table name, bro')
 		return
+	if table_name in ('system_regions','station_information'):
+		#get inserts and add 'I','Y' to end for transtype and latest_row_ind
+		records_list = [record.to_list() + ['I','Y'] for record in data['inserts']]
+		#same but 'U' for updates
+		records_list += [record.to_list() + ['U','Y'] for record in data['updates']]
+		#deletes are kinda different since they are not objects and have old date
+		records_list += [list(record) + ['D','Y'] for record in data['deletes']]
 
-	#get inserts and add 'I','Y' to end for transtype and latest_row_ind
-	records_list = [record.to_list() + ['I','Y'] for record in data['inserts']]
-	#same but 'U' for updates
-	records_list += [record.to_list() + ['U','Y'] for record in data['updates']]
-	#deletes are kinda different since they are not objects and have old date
-	records_list += [list(record) + ['D','Y'] for record in data['deletes']]
+		
+	elif table_name == 'station_status':
+		#station status is only inserts and table is formatted differently
+		records_list = [record.to_list() for record in data]
+		metadata[4] = len(records_list)
 
 	#create SQL statement. 
 	#since different data has different amount of cols, leave statement open
@@ -281,20 +285,26 @@ def etl(table_name):
 
 	data = get_data(table_name, metadata)
 	if(table_name == 'system_regions'):
-		data_list = [System_Region(record) for record in data]
+		data = [System_Region(record) for record in data]
 	elif(table_name == 'station_information'):
-		data_list = [Station_Information(record) for record in data]
-	
-	data = compare_data(data_list, table_name, metadata)
-	if((len(data['inserts'])+len(data['updates'])+len(data['deletes'])) == 0):
-		print('no data to insert, update, or delete.')
-		return
-	update_old(data,table_name)
+		data = [Station_Information(record) for record in data]
+	elif(table_name == 'station_status'):
+		data = [Station_Status(record) for record in data]
+
+	#only compare and update for regions and station_information
+	if table_name in ('system_regions','station_information'):
+		data = compare_data(data, table_name, metadata)
+		if((len(data['inserts'])+len(data['updates'])+len(data['deletes'])) == 0):
+			print('no data to insert, update, or delete.')
+			return
+		update_old(data,table_name)
+
 	load_data(data,table_name, metadata)
 
 def main():
 	etl('station_information')
 	etl('system_regions')
+	#etl('station_status')
 
 
 if __name__ == '__main__':
