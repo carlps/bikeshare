@@ -10,7 +10,13 @@ datasets:
 x- system_regions
 x- station_information
     x-test update/delete and should be good
--- station_status
+!- station_status
+    x- full load
+    !- cdc/stream load
+    !- view (max last_updated group by ID)
+        SELECT MAX(last_updated), station_id, ...
+        FROM station_status
+        GROUP BY station_id
 
 X fix set_station_md5
 
@@ -40,3 +46,11 @@ tests:
 -empty file
 -views are correct
 
+make a utils lib with things like:
+    def backup_file(file):
+        '''
+        makes a copy of file with .bkp appended to filename in current working dir
+        '''
+        fname = os.path.join(os.getcwd(),file)
+        fname_bkp = f'{fname}.bkp'
+        return shutil.copyfile(fname,fname_bkp)
