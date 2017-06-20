@@ -21,7 +21,7 @@ x- station_information
 X fix set_station_md5
 
 X- control table
-    !-change start/end to decimal
+    x-change start/end to decimal
 !- unit tests
 !- rollback on error
 
