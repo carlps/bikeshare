@@ -12,7 +12,7 @@ x- station_information
     x-test update/delete and should be good
 !- station_status
     x- full load
-    !- cdc/stream load
+    !!- cdc/stream load
     !- view (max last_updated group by ID)
         SELECT MAX(last_updated), station_id, ...
         FROM station_status
@@ -36,7 +36,7 @@ sqlalchemy?
 station status might be better for mongodb?
 
 
-X-python 3.6?
+X-python 3.6
 
 What happens when I, D, and then new? Probably a new I, right?
 
