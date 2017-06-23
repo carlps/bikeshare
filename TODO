@@ -13,7 +13,7 @@ x- station_information
 !- station_status
     x- full load
     !!- cdc/stream load
-    !- view (max last_updated group by ID)
+    x- view (max last_updated group by ID)
         SELECT MAX(last_updated), station_id, ...
         FROM station_status
         GROUP BY station_id
