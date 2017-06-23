@@ -22,7 +22,7 @@ class Station_Status():
 
 		if type(self.record) == tuple:
 			self.last_updated = self.record[0]
-			self.station_id = self.record[1]
+			self.station_id = int(self.record[1])
 			self.num_bikes_available = self.record[2]
 			self.num_bikes_disabled = self.record[3]
 			self.num_docks_available = self.record[4]
@@ -35,7 +35,7 @@ class Station_Status():
 		elif type(self.record) == dict:
 
 			self.last_updated = record['last_updated']
-			self. station_id = record['station_id']
+			self. station_id = int(record['station_id'])
 			self.num_bikes_available = record['num_bikes_available']
 			self.num_docks_available = record['num_docks_available']
 			self.is_installed = record['is_installed']

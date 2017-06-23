@@ -62,10 +62,10 @@ def compare(new_row,old_row,last_updated,out,latest_data):
 	new_row = Station_Status(new_row).to_list()
 	if new_row[2:-1] != old_row[1:-1]: #if changed
 		#out is list to be inserted into db
-		out.append(new_row)
+		out.append({'new':new_row[:],'old':old_row[:]})
 		#replace old data in db_data dict with new
 		#pop station ID from index 1 for key
-		latest_data[int(new_row.pop(1))] = new_row
+		latest_data[new_row.pop(1)] = new_row
 
 
 def load_db(out):
@@ -79,11 +79,6 @@ def load_db(out):
 	print(f'updated {len(out)} rows.')
 
 
-#######################################
-#######################################
-### LOOP IS UPDATING ALL EVERY TIME ###
-#######################################
-#######################################
 
 def station_status_cdc(db):
 	db_data = get_latest_from_db(db)
@@ -99,9 +94,10 @@ def station_status_cdc(db):
 								new_data['last_updated'],out,db_data)
 				except KeyError: 
 					#key error means not in db_data so insert new record
+					print(f'new row! id: {new_row["station_id"]}')
 					new_row['last_updated'] = new_data['last_updated']
 					new_row = Station_Status(new_row).to_list()
-					out.append(new_row)
+					out.append(new_row[:])
 					db_data[new_row.pop(1)] = new_row #add to latest
 			load_db(out)  
 
