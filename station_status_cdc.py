@@ -52,10 +52,10 @@ def write_log(message):
 		file.write(f'{message}\t||\t{(strftime("%c"))}\n')
 
 
-def compare(new_row,old_row,last_updated,out,new_data):
+def compare(new_row,old_row,last_updated,out,latest_data):
 	'''
 	compare new and old
-	if changed, add data to update and new_data
+	if changed, add data to update and latest_data
 	'''
 	old_row = list(old_row) #convert from tuple to list
 	new_row['last_updated'] = last_updated
@@ -65,7 +65,7 @@ def compare(new_row,old_row,last_updated,out,new_data):
 		out.append(new_row)
 		#replace old data in db_data dict with new
 		#pop station ID from index 1 for key
-		new_data[new_row.pop(1)] = new_row
+		latest_data[int(new_row.pop(1))] = new_row
 
 
 def load_db(out):
@@ -109,7 +109,10 @@ def station_status_cdc(db):
 			if nextFileTstmp-time() > 0:
 				print(f'got data. sleepng for {nextFileTstmp-time()} seconds')
 				sleep(nextFileTstmp-time())
+			else:
+				print(f'got data. no time to sleep, checking again.\nnextTstmp:{nextFileTstmp}\tnow:{time()}')
 		else:
+			print(f'sleeping {nextFileTstmp-time()} til next update')
 			sleep(nextFileTstmp-time())
 
 def main():
