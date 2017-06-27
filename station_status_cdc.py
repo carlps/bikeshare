@@ -5,6 +5,8 @@ from time import time,sleep,strftime
 import requests
 from models.station_status import Station_Status
 
+import json #temp for test files
+
 def get_latest_from_db(db):
 	'''
 	get latest station_status data from database
@@ -47,6 +49,8 @@ def get_data_api():
 
 	return response.json()
 
+
+
 def write_log(message):
 	with open('cdc_log.txt','a') as file:
 		file.write(f'{message}\t||\t{(strftime("%c"))}\n')
@@ -62,23 +66,25 @@ def compare(new_row,old_row,last_updated,out,latest_data):
 	new_row = Station_Status(new_row).to_list()
 	if new_row[2:-1] != old_row[1:-1]: #if changed
 		#out is list to be inserted into db
-		out.append({'new':new_row[:],'old':old_row[:]})
+		out.append(new_row[:])
 		#replace old data in db_data dict with new
 		#pop station ID from index 1 for key
 		latest_data[new_row.pop(1)] = new_row
 
 
-def load_db(out):
+def load_db(out,db):
 	'''
 	load new data into db
 	'''
-	with open('test_out','a') as file:
-		for row in out:
-			file.write(str(row))
+	insert_sql = 'INSERT INTO station_status VALUES (?,?,?,?,?,?,?,?,?,?)'
+
+	connection = sqlite3.connect(db)
+	connection.executemany(insert_sql,out)
+	connection.commit()
+	connection.close()
+	
 
 	print(f'updated {len(out)} rows.')
-
-
 
 def station_status_cdc(db):
 	db_data = get_latest_from_db(db)
@@ -99,10 +105,15 @@ def station_status_cdc(db):
 					new_row = Station_Status(new_row).to_list()
 					out.append(new_row[:])
 					db_data[new_row.pop(1)] = new_row #add to latest
-			load_db(out)  
+
+			if len(out) > 0:
+				load_db(out,db)
+				#for testing, write out json to file:
+				with open(f'test_out/{new_data["last_updated"]}.json', 'w') as outfile:
+					json.dump(new_data,outfile)
 
 			nextFileTstmp = new_data['last_updated'] + new_data['ttl']
-			if nextFileTstmp-time() > 0:
+			if nextFileTstmp-int(time()) > 0:
 				print(f'got data. sleepng for {nextFileTstmp-time()} seconds')
 				sleep(nextFileTstmp-time())
 			else:

@@ -304,7 +304,7 @@ def etl(table_name):
 def main():
 	etl('station_information')
 	etl('system_regions')
-	#etl('station_status')
+	etl('station_status')
 
 
 if __name__ == '__main__':
