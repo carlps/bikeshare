@@ -84,40 +84,48 @@ def load_db(out,db):
 	connection.close()
 	
 
-	print(f'updated {len(out)} rows.')
-
 def station_status_cdc(db):
 	db_data = get_latest_from_db(db)
 	nextFileTstmp = 0
+	lastFileTstmp = 0
 	while True:
 		out = [] #reset each loop
 		if int(time()) >= nextFileTstmp:
 			new_data = get_data_api()
-			for new_row in new_data['data']['stations']:
-				try:
-					if new_row['last_reported'] != db_data[int(new_row['station_id'])][-1]: #last spot in latest_dict is last_reported
-						compare(new_row,db_data[int(new_row['station_id'])],\
-								new_data['last_updated'],out,db_data)
-				except KeyError: 
-					#key error means not in db_data so insert new record
-					print(f'new row! id: {new_row["station_id"]}')
-					new_row['last_updated'] = new_data['last_updated']
-					new_row = Station_Status(new_row).to_list()
-					out.append(new_row[:])
-					db_data[new_row.pop(1)] = new_row #add to latest
+			if new_data['last_updated'] != lastFileTstmp:
+				for new_row in new_data['data']['stations']:
+					try:
+						if new_row['last_reported'] != db_data[int(new_row['station_id'])][-1]: #last spot in latest_dict is last_reported
+							compare(new_row,db_data[int(new_row['station_id'])],\
+									new_data['last_updated'],out,db_data)
+					except KeyError: 
+						#key error means not in db_data so insert new record
+						print(f'new row! id: {new_row["station_id"]}')
+						new_row['last_updated'] = new_data['last_updated']
+						new_row = Station_Status(new_row).to_list()
+						out.append(new_row[:])
+						db_data[new_row.pop(1)] = new_row #add to latest
 
-			if len(out) > 0:
-				load_db(out,db)
-				#for testing, write out json to file:
-				with open(f'test_out/{new_data["last_updated"]}.json', 'w') as outfile:
-					json.dump(new_data,outfile)
+				if len(out) > 0:
+					load_db(out,db)
+					#for testing, write out json to file:
+					with open(f'test_out/{new_data["last_updated"]}.json', 'w') as outfile:
+						json.dump(new_data,outfile)
+					print(f'updated {len(out)} rows at {time()} for {new_data["last_updated"]}')
+				else:
+					print(f'no changes. nothing to load. for {new_data["last_updated"]}')
 
-			nextFileTstmp = new_data['last_updated'] + new_data['ttl']
-			if nextFileTstmp-int(time()) > 0:
-				print(f'got data. sleepng for {nextFileTstmp-time()} seconds')
-				sleep(nextFileTstmp-time())
+				lastFileTstmp = new_data['last_updated']
+				nextFileTstmp = new_data['last_updated'] + new_data['ttl']
+
+				if nextFileTstmp > int(time()):
+					print(f'got data. sleepng for {nextFileTstmp-time()} seconds')
+					sleep(nextFileTstmp-time()+1) #add 1 since file is often not there on first check at time
+				else:
+					print(f'got data. no time to sleep, checking again.\nnextTstmp:{nextFileTstmp}\tnow:{time()}')
 			else:
-				print(f'got data. no time to sleep, checking again.\nnextTstmp:{nextFileTstmp}\tnow:{time()}')
+				print('file not yet updated. sleeping 1.')
+				sleep(1)
 		else:
 			print(f'sleeping {nextFileTstmp-time()} til next update')
 			sleep(nextFileTstmp-time())
