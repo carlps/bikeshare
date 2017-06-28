@@ -12,8 +12,8 @@ x- station_information
     x-test update/delete and should be good
 !- station_status
     x- full load
-    !!- cdc/stream load
-        -TEST
+    x!- cdc/stream load
+        x-TEST
     x- view (max last_updated group by ID)
         SELECT MAX(last_updated), station_id, ...
         FROM station_status
@@ -26,26 +26,29 @@ X- control table
 !- unit tests
 !- rollback on error
 
+clean up code.
+    in models.__init__ can you make import * import *.*?
+        ex: instead of from models.system_regions import System_Region, etc
+            would rather just from models import *
 
-in models.__init__ can you make import * import *.*?
-    ex: instead of from models.system_regions import System_Region, etc
-        would rather just from models import *
+sqlalchemy
 
-sqlalchemy?
---will do one after sqlite and compare
 
 station status might be better for mongodb?
 
 
 X-python 3.6
 
-What happens when I, D, and then new? Probably a new I, right?
+unit tests
 
 tests:
 -insert on empty db
 -compare IUD
 -empty file
 -views are correct
+
+What happens when I, D, and then new? Probably a new I, right?
+
 
 make a utils lib with things like:
     def backup_file(file):
