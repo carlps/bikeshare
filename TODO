@@ -10,7 +10,8 @@ datasets:
 x- system_regions
 x- station_information
     x-test update/delete and should be good
-!- station_status
+    --better way to unpack rental methods?
+x- station_status
     x- full load
     x!- cdc/stream load
         x-TEST
@@ -32,6 +33,11 @@ clean up code.
             would rather just from models import *
 
 sqlalchemy
+    --convert to datetimes to datetime
+
+models all in one file models.py
+    --can remove to_lists?
+    --metadata class?
 
 
 station status might be better for mongodb?
