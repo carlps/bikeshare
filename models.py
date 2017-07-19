@@ -1,11 +1,16 @@
 import sqlalchemy
 from sqlalchemy import Column, Integer, Text, Numeric, Boolean, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 
 import hashlib
 
 Base = declarative_base()
+
+class Dimension():
+	def set_transtype_and_latest(self,transtype,latest):
+		self.transtype = transtype
+		self.latest_row_ind = latest
 
 class Station_Status(Base):
 	'''
@@ -76,7 +81,7 @@ class Station_Status(Base):
 			self.last_reported = record['last_reported']
 
 
-			#optionals
+			# optionals
 			self.set_num_bikes_disabled()
 			self.set_num_docks_disabled()
 
@@ -139,7 +144,7 @@ class Station_Status(Base):
             f'\tlast_reported={self.last_reported},\n'
             ')>')
 
-class Station_Information(Base):
+class Station_Information(Dimension, Base):
 	'''
 	Represents a record of information about a station
 	extends Base from sqlalchemy
@@ -179,6 +184,10 @@ class Station_Information(Base):
 								order_by=Station_Status.last_updated,\
 								back_populates='station_information')
 
+	# create sqlalchemy synonyms to lookup easier
+	id = synonym("station_id")
+	md5 = synonym("station_md5")
+
 
 
 	def __init__(self,record):
@@ -195,22 +204,21 @@ class Station_Information(Base):
 		self.record = record
 
 		self.last_updated = record['last_updated']
-		#convert id to int
+		# convert id to int
 		self.station_id = int(record['station_id'])
 		self.name = record['name']
 		self.lat = record['lat']
 		self.lon = record['lon']
 		
-		#optional fields use set_
+		# optional fields use set_
 		self.set_short_name()
 		self.set_region_id()
 		self.set_capacity()
 		self.set_eightd_has_key_dispenser()
-
-		
-
 		self.unpack_rental_methods()
-		self.set_station_md5()
+
+		# calculate md5
+		self.station_md5 = self.hash_station()
 
 	def set_short_name(self):
 		try:
@@ -250,7 +258,7 @@ class Station_Information(Base):
 			self.rental_method_TRANSITCARD = None
 			self.rental_method_ACCOUNTNUMBER = None
 			self.rental_method_PHONE = None
-		#more elegant way?
+		# more elegant way?
 		if 'KEY' in self.rental_methods:
 			self.rental_method_KEY = True
 		else:
@@ -284,28 +292,25 @@ class Station_Information(Base):
 		else:
 			self.rental_method_PHONE = False
 		
-	def set_station_md5(self):
+	def hash_station(self):
 		'''
-		get string of attributes in predefined order
-		set station_md5 to md5 of string
+		return md5 of string of attributes in predefined order
 		'''
 
-		attr_string = str(self.station_id) + self.short_name +\
-					  self.name + str(self.lat) + str(self.lon) +\
-					  str(self.capacity) + str(self.region_id) + \
-					  str(self.eightd_has_key_dispenser) +\
-					  str(self.rental_method_KEY) +\
-					  str(self.rental_method_CREDITCARD) +\
-					  str(self.rental_method_PAYPASS) +\
-					  str(self.rental_method_APPLEPAY) +\
-					  str(self.rental_method_ANDROIDPAY) +\
-					  str(self.rental_method_TRANSITCARD) +\
-					  str(self.rental_method_ACCOUNTNUMBER) +\
-					  str(self.rental_method_PHONE)
-					  
-
-
-		self.station_md5 = hashlib.md5(str.encode(attr_string)).hexdigest()
+		return hashlib.md5(str.encode(str(self.station_id) +\
+							self.short_name +\
+							self.name + str(self.lat) + str(self.lon) +\
+							str(self.capacity) + str(self.region_id) + \
+							str(self.eightd_has_key_dispenser) +\
+							str(self.rental_method_KEY) +\
+							str(self.rental_method_CREDITCARD) +\
+							str(self.rental_method_PAYPASS) +\
+							str(self.rental_method_APPLEPAY) +\
+							str(self.rental_method_ANDROIDPAY) +\
+							str(self.rental_method_TRANSITCARD) +\
+							str(self.rental_method_ACCOUNTNUMBER) +\
+							str(self.rental_method_PHONE)
+							)).hexdigest()
 
 	def to_list(self):
 		'''
@@ -339,10 +344,8 @@ class Station_Information(Base):
 				self.station_md5]
 
 	def none_to_null(self,value):
-		'''
-		def if a value is None, return "NULL"
-		else return value
-		'''
+		'''if a value is None, return "NULL"
+		else return value'''
 		return value if value is not None else "NULL"
 
 	def __repr__(self):
@@ -369,7 +372,8 @@ class Station_Information(Base):
 		f'\tlatest_row_ind={self.latest_row_ind}'
 		')>')
 
-class System_Region(Base):
+
+class System_Region(Dimension,Base):
 	'''
 	represents a System Region (dimension)
 	extends Base from sqlalchemy
@@ -393,6 +397,10 @@ class System_Region(Base):
 							order_by=Station_Information.station_id,\
 							back_populates='region')
 
+	# create sqlalchemy synonyms to lookup easier
+	id = synonym("region_id")
+	md5 = synonym("region_md5")
+
 	def __init__(self,record):
 		'''
 		record should be a dict with the following keys:
@@ -401,20 +409,17 @@ class System_Region(Base):
 		region_md5 is calculated using the hashlib md5
 		'''
 		self.last_updated = record['last_updated']
-		#convert region_id to int
-		self.region_id = int(record['region_id'])
+		self.region_id = int(record['region_id']) # convert region_id to int
 		self.name = record['name']
-		self.set_region_md5()
-
-
+		self.region_md5 = self.hash_region()
 
 	def __repr__(self):
 		return (f'<System_Region(last_updated={self.last_updated}, '
 				f'region_id={self.region_id}, name={self.name}, '
 				f'region_md5={self.region_md5})>')
 
-	def set_region_md5(self):
-		self.region_md5 = hashlib.md5(str.encode(str(self.region_id)\
+	def hash_region(self):
+		return hashlib.md5(str.encode(str(self.region_id)\
 									 + self.name)).hexdigest()
 
 	def to_list(self):
