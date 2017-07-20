@@ -6,15 +6,18 @@ sqlalchemy
         x-compare
         x-update_old
         x-load
-        --metadata
+        x-metadata
     --cdc
+
+run.py file which runs bikeshare_etl for specific set, cdc, etc.
 
 X models all in one file models.py
     --can remove to_lists?
     --metadata class?
     --maybe a parent class (like Record?) that has base attributes? (to clean: if model==...)
-        --maybe parent dimension or dim?
-        -- I think I could do the parent, with some things let set_md5(md5_col), get_md5(md5_col) etc.
+        x-maybe parent dimension or dim?
+        x-parent set_md5
+        --class like Latest_System_Region(System_Region): __tablename__ = 'view'
 
 
 station status might be better for mongodb?

@@ -1,16 +1,37 @@
+import hashlib
+import time
+
 import sqlalchemy
 from sqlalchemy import Column, Integer, Text, Numeric, Boolean, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, synonym
 
-import hashlib
 
 Base = declarative_base()
 
 class Dimension():
+
 	def set_transtype_and_latest(self,transtype,latest):
 		self.transtype = transtype
 		self.latest_row_ind = latest
+
+	def set_md5(self, record):
+		'''
+		Record is a dictionary instance of an object.
+		With the exception of last_updated, convert all attributes to
+		string, and concatenate all into one string with no delimiter.
+		Returns md5 hash of string of attributes
+		'''
+
+		record_string = ''
+		
+		for key in record.keys():
+			if key != 'last_updated':
+				record_string += str(record[key])
+
+		return hashlib.md5(str.encode(record_string)).hexdigest()
+
+
 
 class Station_Status(Base):
 	'''
@@ -218,7 +239,7 @@ class Station_Information(Dimension, Base):
 		self.unpack_rental_methods()
 
 		# calculate md5
-		self.station_md5 = self.hash_station()
+		self.station_md5 = self.set_md5(record)
 
 	def set_short_name(self):
 		try:
@@ -291,62 +312,6 @@ class Station_Information(Dimension, Base):
 			self.rental_method_PHONE = True
 		else:
 			self.rental_method_PHONE = False
-		
-	def hash_station(self):
-		'''
-		return md5 of string of attributes in predefined order
-		'''
-
-		return hashlib.md5(str.encode(str(self.station_id) +\
-							self.short_name +\
-							self.name + str(self.lat) + str(self.lon) +\
-							str(self.capacity) + str(self.region_id) + \
-							str(self.eightd_has_key_dispenser) +\
-							str(self.rental_method_KEY) +\
-							str(self.rental_method_CREDITCARD) +\
-							str(self.rental_method_PAYPASS) +\
-							str(self.rental_method_APPLEPAY) +\
-							str(self.rental_method_ANDROIDPAY) +\
-							str(self.rental_method_TRANSITCARD) +\
-							str(self.rental_method_ACCOUNTNUMBER) +\
-							str(self.rental_method_PHONE)
-							)).hexdigest()
-
-	def to_list(self):
-		'''
-		last_updated, station_id, short_name, name, lat, lon, 
-		capacity, region_id, eightd_has_key_dispenser, rental_method_KEY, 
-		rental_method_CREDITCARD, rental_method_PAYPASS, 
-		rental_method_APPLEPAY, rental_method_ANDROIDPAY, 
-		rental_method_TRANSITCARD, rental_method_ACCOUNTNUMBER, 
-		rental_method_PHONE, station_md5, transtype, latest_row_ind
-
-		use none_to_null() on optionals
-		'''
-
-		return [self.last_updated, 
-				self.station_id, 
-				self.none_to_null(self.short_name), 
-				self.name, 
-				self.lat, 
-				self.lon, 
-				self.none_to_null(self.capacity), 
-				self.none_to_null(self.region_id), 
-				self.none_to_null(self.eightd_has_key_dispenser), 
-				self.none_to_null(self.rental_method_KEY), 
-				self.none_to_null(self.rental_method_CREDITCARD), 
-				self.none_to_null(self.rental_method_PAYPASS), 
-				self.none_to_null(self.rental_method_APPLEPAY), 
-				self.none_to_null(self.rental_method_ANDROIDPAY), 
-				self.none_to_null(self.rental_method_TRANSITCARD), 
-				self.none_to_null(self.rental_method_ACCOUNTNUMBER), 
-				self.none_to_null(self.rental_method_PHONE),
-				self.station_md5]
-
-	def none_to_null(self,value):
-		'''if a value is None, return "NULL"
-		else return value'''
-		return value if value is not None else "NULL"
 
 	def __repr__(self):
 		return ('<System_Information(\n'
@@ -411,23 +376,46 @@ class System_Region(Dimension,Base):
 		self.last_updated = record['last_updated']
 		self.region_id = int(record['region_id']) # convert region_id to int
 		self.name = record['name']
-		self.region_md5 = self.hash_region()
+		self.region_md5 = self.set_md5(record)
 
 	def __repr__(self):
 		return (f'<System_Region(last_updated={self.last_updated}, '
 				f'region_id={self.region_id}, name={self.name}, '
 				f'region_md5={self.region_md5})>')
 
-	def hash_region(self):
-		return hashlib.md5(str.encode(str(self.region_id)\
-									 + self.name)).hexdigest()
 
-	def to_list(self):
+class Load_Metadata(Base):
+	'''
+	Control table used to capture metadata of a load.
+	Instantiated with dataset name, the rest is set throughout
+	the load process.
+	'''
+
+	__tablename__ = 'load_metadata'
+
+	last_updated_tstmp = Column(Integer, primary_key=True)
+	dataset = Column(Text, primary_key=True)
+	start_time = Column(Numeric)
+	end_time = Column(Numeric)
+	inserts = Column(Integer)
+	updates = Column(Integer)
+	deletes = Column(Integer)
+
+	def __init__(self, dataset):
 		'''
-		returns a list of the attributes in the following order:
-		last_updated, region_id, name, region_md5
-		used to to insert into db
+		a new metadata record should be instantiated with the name of the dataset
+		start time will be inserted automatically
 		'''
-		return [self.last_updated, self.region_id, self.name, self.region_md5]
+		self.dataset = dataset
+		self.start_time = time.time()
 
-
+	def __repr__(self):
+		return ('<Load_Metadata(\n'
+				f'last_updated_tstmp={self.last_updated_tstmp},\n'
+				f'dataset={self.dataset}\n'
+				f'start_time={self.start_time}\n'
+				f'end_time={self.end_time}\n'
+				f'inserts={self.inserts}\n'
+				f'updates={self.updates}\n'
+				f'deletes={self.deletes}\n'
+				')>')

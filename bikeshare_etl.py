@@ -20,7 +20,7 @@ import sqlalchemy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, make_transient
 
-from models import Station_Status, Station_Information, System_Region, Dimension
+from models import Station_Status, Station_Information, System_Region, Dimension, Load_Metadata
 	
 def get_session():
 	'''
@@ -44,9 +44,7 @@ def get_data(model, metadata):
 	uses requests to lookup bikeshare data
 	model should be one of the main data models in models.py
 
-	metadata is a list with metadata that is updated throughout the process
-	in this function, the first slot in the list is given last_updated
-	--TODO: create a model for metadata
+	metadata is a database record with metadata for the load
 
 	returns list of objects (each of type model)
 	'''
@@ -92,8 +90,8 @@ def get_data(model, metadata):
 
 	print(f'{model.__name__}: extract done. {len(data)} rows of data')
 
-	# update metadata
-	metadata[0] = last_updated
+	# update metadata with last_updated
+	metadata.last_updated_tstmp = last_updated
 
 	# return list of objects
 	return data
@@ -135,6 +133,11 @@ def compare_data(data,model,metadata):
 	
 	# quick check - if matches has 0, set all records to inserts and return
 	if len(matches) == 0:
+		for row in data:
+			row.set_transtype_and_latest('I','Y')
+		metadata.inserts = len(data)
+		metadata.updates = 0
+		metadata.deletes = 0
 		print(f'{model.__name__}: all new records. {len(data)} inserts')
 		return {'inserts':data,'updates':[],'updates_old':[],'deletes':[]}
 
@@ -184,9 +187,9 @@ def compare_data(data,model,metadata):
 			updates.append(row)
 	
 	# update metadata
-	metadata[4] = len(inserts)
-	metadata[5] = len(updates)
-	metadata[6] = len(deletes)
+	metadata.inserts = len(inserts)
+	metadata.updates = len(updates)
+	metadata.deletes = len(deletes)
 
 	print(f'{model.__name__}: compared data. {len(inserts)} inserts. ',
 		f'{len(updates)} updates. {len(deletes)} deletes.')
@@ -243,11 +246,13 @@ def load_data(data, model, metadata):
 	# insert batch into db
 	session = get_session()
 	session.add_all(batch)
-	# TODO load metadata as well
+	metadata.end_time = time.time()
+	session.add(metadata)
 	session.commit()
 
-	print(f'{model.__name__}: load done. loaded {len(batch)} records.'\
-		  f'\nsee table load_metadata, last_updated {metadata[0]} for details')
+	print(f'{model.__name__}: load done. loaded {len(batch)} records.'
+		  f'\nsee table load_metadata, '
+		  f'last_updated {metadata.last_updated_tstmp} for details')
 
 def etl(model):
 	'''
@@ -256,8 +261,8 @@ def etl(model):
 
 	table_name = model.__tablename__
 
-	# instantiate metadata list and set dataset, start time
-	metadata = [0,table_name,int(time.time()),0,0,0,0]
+	# instantiate metadata object
+	metadata = Load_Metadata(table_name)
 
 	data = get_data(model, metadata)
 	
@@ -269,7 +274,7 @@ def etl(model):
 			return
 		update_old(data,model)
 
-	load_data(data,model,table_name)
+	load_data(data,model,metadata)
 
 def main():
 	etl(Station_Information)
