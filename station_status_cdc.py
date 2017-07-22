@@ -1,39 +1,46 @@
 #station_status_cdc.py
 
-import sqlite3
-from time import time,sleep,strftime
-import requests
-from models.station_status import Station_Status
-
 import json #temp for test files
+import requests
+from time import time,sleep,strftime
 
-def get_latest_from_db(db):
+from sqlalchemy import and_
+from sqlalchemy.sql import func
+from sqlalchemy.orm import make_transient
+
+from utils import get_session
+from models import Station_Status
+
+
+def get_latest_from_db(session):
 	'''
 	get latest station_status data from database
-	returns list of 
+	returns dict with station_id as key and object as value
 	'''
-	connection = sqlite3.connect(db)
-	latest_sql = '''SELECT 
-					station_id,
-					last_updated,
-					num_bikes_available,
-					num_bikes_disabled,
-					num_docks_available,
-					num_docks_disabled,
-					is_installed,
-					is_renting,
-					is_returning,
-					last_reported
-					FROM v_station_status'''
-	latest = connection.execute(latest_sql).fetchall()
-	#convert list of tuples to dict with station_id as key
+	#first define subquery which gets latest timestamp and ID
+	subq = session.query(\
+						func.max(Station_Status.last_updated).
+							label('last_updated'),\
+						Station_Status.station_id
+						).group_by(Station_Status.station_id).subquery()
+
+	#get latest by joining station_status with subquery
+	latest = session.query(Station_Status).\
+					join(subq,\
+						and_(Station_Status.last_updated==subq.c.last_updated,\
+							Station_Status.station_id==subq.c.station_id)\
+						).all()
 	latest_dict = {}
 	for row in latest:
-		latest_dict[row[0]] = row[1:]
+		# need to expunge and make transient because
+		# we just want copies of the data, not connected to db
+		session.expunge(row)
+		make_transient(row)
+		latest_dict[row.station_id] = row
 	return latest_dict
 
 
-def get_data_api():
+def get_data_from_api():
 	'''
 	get data from api
 	make sure to return data, last_updated, and ttl
@@ -50,89 +57,115 @@ def get_data_api():
 	return response.json()
 
 
-
 def write_log(message):
 	with open('cdc_log.txt','a') as file:
 		file.write(f'{message}\t||\t{(strftime("%c"))}\n')
 
 
-def compare(new_row,old_row,last_updated,out,latest_data):
+def add_to_out_and_latest(new_row, out, latest_data):
 	'''
-	compare new and old
-	if changed, add data to update and latest_data
+	If a row is found to be new, run this to 
+	add to output list as well as latest data dict.
+	
+	For latest data dict, will either replace old record
+	or insert new record if that ID isn't already in there.
 	'''
-	old_row = list(old_row) #convert from tuple to list
-	new_row['last_updated'] = last_updated
-	new_row = Station_Status(new_row).to_list()
-	if new_row[2:-1] != old_row[1:-1]: #if changed
-		#out is list to be inserted into db
-		out.append(new_row[:])
-		#replace old data in db_data dict with new
-		#pop station ID from index 1 for key
-		latest_data[new_row.pop(1)] = new_row
+	out.append(new_row)
+	make_transient(new_row)
+	latest_data[new_row.station_id] = new_row
 
 
-def load_db(out,db):
+def load_db(out, session):
 	'''
 	load new data into db
 	'''
-	insert_sql = 'INSERT INTO station_status VALUES (?,?,?,?,?,?,?,?,?,?)'
+	session.add_all(out)
+	session.commit()
+	for record in out:
+		session.expunge(record)
+		make_transient(record)
 
-	connection = sqlite3.connect(db)
-	connection.executemany(insert_sql,out)
-	connection.commit()
-	connection.close()
-	
 
-def station_status_cdc(db):
-	db_data = get_latest_from_db(db)
+def station_status_cdc():
+	session = get_session(echo=True)
+	db_data = get_latest_from_db(session)
 	nextFileTstmp = 0
 	lastFileTstmp = 0
+	# infinite loop
 	while True:
-		out = [] #reset each loop
-		if int(time()) >= nextFileTstmp:
-			new_data = get_data_api()
-			if new_data['last_updated'] != lastFileTstmp:
-				for new_row in new_data['data']['stations']:
-					try:
-						if new_row['last_reported'] != db_data[int(new_row['station_id'])][-1]: #last spot in latest_dict is last_reported
-							compare(new_row,db_data[int(new_row['station_id'])],\
-									new_data['last_updated'],out,db_data)
-					except KeyError: 
-						#key error means not in db_data so insert new record
-						print(f'new row! id: {new_row["station_id"]}')
+		try:
+			out = [] # reset output list with each loop
+			# first check next file tstmp to ensure api is updated
+			if int(time()) >= nextFileTstmp:
+				new_data = get_data_from_api()
+				# sometimes nextFileTstmp is off by a second or two
+				# so ensure new data is actually new
+				if new_data['last_updated'] != lastFileTstmp:
+					for new_row in new_data['data']['stations']:
+						# create a Station_Status object from new row
 						new_row['last_updated'] = new_data['last_updated']
-						new_row = Station_Status(new_row).to_list()
-						out.append(new_row[:])
-						db_data[new_row.pop(1)] = new_row #add to latest
+						new_obj = Station_Status(new_row)
+						try:
+							old_obj = db_data[new_obj.station_id]
+						except KeyError: 
+							# key error means not in db_data
+							# aka a new record
+							print(f'new row! id: {new_obj.station_id}')
+							# add new record to output list and latest
+							add_to_out_and_latest(new_row=new_obj,
+												  out=out,
+												  latest_data=db_data)
 
-				if len(out) > 0:
-					load_db(out,db)
-					#for testing, write out json to file:
-					with open(f'test_out/{new_data["last_updated"]}.json', 'w') as outfile:
-						json.dump(new_data,outfile)
-					print(f'updated {len(out)} rows at {time()} for {new_data["last_updated"]}')
+						# if rows are different
+						if (new_obj.is_different(old_obj)):
+							# add new to out and replace old in latest
+							add_to_out_and_latest(new_row=new_obj,
+												  out=out,
+												  latest_data=db_data)
+					if len(out) > 0: # if we have records to output
+						load_db(out,session)
+						# for testing, write out json to file:
+						with open(f'test_out/{new_data["last_updated"]}.json',
+									'w') as outfile:
+							json.dump(new_data,outfile)
+
+						print(f'updated {len(out)} rows at {time()} ' 
+							  f'for {new_data["last_updated"]}')
+					else:
+						print('no changes. nothing to load ' 
+							 f'for {new_data["last_updated"]}')
+
+					lastFileTstmp = new_data['last_updated']
+					nextFileTstmp = new_data['last_updated'] + new_data['ttl']
+
+					# if comparison and load completed before new data is up
+					if nextFileTstmp > int(time()):
+						print('got data. sleepng for '
+							 f'{nextFileTstmp-time()} seconds')
+						# add 1 since file might not be there on first check
+						sleep(nextFileTstmp-time()+1) 
+					# if comparison and load completed 
+					# after new data should be up
+					else:
+						print('got data. no time to sleep, '
+							  'checking again.\n'
+							 f'nextTstmp:{nextFileTstmp}\tnow:{time()}')
+				# if loop restarted but data pulled is not new
 				else:
-					print(f'no changes. nothing to load. for {new_data["last_updated"]}')
-
-				lastFileTstmp = new_data['last_updated']
-				nextFileTstmp = new_data['last_updated'] + new_data['ttl']
-
-				if nextFileTstmp > int(time()):
-					print(f'got data. sleepng for {nextFileTstmp-time()} seconds')
-					sleep(nextFileTstmp-time()+1) #add 1 since file is often not there on first check at time
-				else:
-					print(f'got data. no time to sleep, checking again.\nnextTstmp:{nextFileTstmp}\tnow:{time()}')
+					print('file not yet updated. sleeping 5.')
+					sleep(5)
+			# if loop started before next file should be up (needed?)
 			else:
-				print('file not yet updated. sleeping 1.')
-				sleep(1)
-		else:
-			print(f'sleeping {nextFileTstmp-time()} til next update')
-			sleep(nextFileTstmp-time())
+				print(f'sleeping {nextFileTstmp-time()} til next update')
+				sleep(nextFileTstmp-time())
+		except KeyboardInterrupt:
+			session.close()
+			print('\nsession closed')
+			break
+
 
 def main():
-	db = 'bikeshare.db'
-	station_status_cdc(db)
+	station_status_cdc()
 
 
 if __name__ == '__main__':

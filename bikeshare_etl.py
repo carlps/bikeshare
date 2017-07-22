@@ -16,28 +16,10 @@ import requests
 import time
 import os
 
-import sqlalchemy
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, make_transient
+from sqlalchemy.orm import make_transient
 
 from models import Station_Status, Station_Information, System_Region, Dimension, Load_Metadata
-	
-def get_session():
-	'''
-	create db connection and sqlalchemy engine
-	return a session to interact with db
-	currently sqlite but not for long
-	'''
-	# grab the folder where this script lives
-	basedir = os.path.abspath(os.path.dirname(__file__))
-	DATABASE = 'bikeshare.db'
-	# define the full path for the database
-	DATABASE_PATH = os.path.join(basedir, DATABASE)
-
-	engine = create_engine(f'sqlite:///{DATABASE_PATH}') # set echo=True in create_engine if debugging
-	Session = sessionmaker(bind=engine)
-
-	return Session()
+from utils import get_session	
 
 def get_data(model, metadata):
 	'''
@@ -249,6 +231,7 @@ def load_data(data, model, metadata):
 	metadata.end_time = time.time()
 	session.add(metadata)
 	session.commit()
+	session.close()
 
 	print(f'{model.__name__}: load done. loaded {len(batch)} records.'
 		  f'\nsee table load_metadata, '

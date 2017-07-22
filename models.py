@@ -78,38 +78,18 @@ class Station_Status(Base):
 		'''
 		self.record = record
 
-		if type(self.record) == tuple:
-			self.last_updated = self.record[0]
-			self.station_id = int(self.record[1])
-			self.num_bikes_available = self.record[2]
-			self.num_bikes_disabled = self.record[3]
-			self.num_docks_available = self.record[4]
-			self.num_docks_disabled = self.record[5]
-			self.is_installed = self.record[6]
-			self.is_renting = self.record[7]
-			self.is_returning = self.record[8]
-			self.last_reported = self.record[9]
-
-		elif type(self.record) == dict:
-
-			self.last_updated = record['last_updated']
-			self. station_id = int(record['station_id'])
-			self.num_bikes_available = record['num_bikes_available']
-			self.num_docks_available = record['num_docks_available']
-			self.is_installed = record['is_installed']
-			self.is_renting = record['is_renting']
-			self.is_returning = record['is_returning']
-			self.last_reported = record['last_reported']
-
-
-			# optionals
-			self.set_num_bikes_disabled()
-			self.set_num_docks_disabled()
-
-		else:
-			raise TypeError('Record must be tuple or dict!')
-
-
+		self.last_updated = record['last_updated']
+		self. station_id = int(record['station_id'])
+		self.num_bikes_available = record['num_bikes_available']
+		self.num_docks_available = record['num_docks_available']
+		self.is_installed = bool(record['is_installed'])
+		self.is_renting = bool(record['is_renting'])
+		self.is_returning = bool(record['is_returning'])
+		self.last_reported = record['last_reported']
+		# optionals
+		self.set_num_bikes_disabled()
+		self.set_num_docks_disabled()
+		
 
 	def set_num_bikes_disabled(self):
 		try:
@@ -122,34 +102,6 @@ class Station_Status(Base):
 			self.num_docks_disabled = self.record['num_docks_disabled']
 		except KeyError:
 			self.num_docks_disabled = None
-
-	def none_to_null(self,value):
-		'''
-		def if a value is None, return "NULL"
-		else return value
-		'''
-		return value if value is not None else "NULL"
-
-	def to_list(self):
-		'''
-		in list to insert sql.
-		must be in order:last_updated, station_id, num_bikes_available, 
-		num_bikes_disabled, num_docks_available, 
-		num_docks_disabled, is_installed, is_renting,
-		is_returning, last_reported
-
-		use none_to_null for empty values
-		'''
-		return [self.last_updated,
-				self.station_id,
-				self.num_bikes_available,
-				self.none_to_null(self.num_bikes_disabled),
-				self.num_docks_available,
-				self.none_to_null(self.num_docks_disabled),
-				self.is_installed,
-				self.is_renting,
-				self.is_returning,
-				self.last_reported]
 
 	def __repr__(self):
 		return ('<Station_Status(\n'
@@ -164,6 +116,27 @@ class Station_Status(Base):
             f'\tis_returning={self.is_returning},\n'
             f'\tlast_reported={self.last_reported},\n'
             ')>')
+
+	def is_different(self,other):
+		'''
+		compare this record with another record
+		based on all attributes besides last_reported and station_id
+
+		return true if the records don't match or false if they are the same
+		'''
+		if (self.num_bikes_available == other.num_bikes_available
+				and self.num_bikes_disabled == other.num_bikes_disabled
+				and self.num_docks_available == other.num_docks_available
+				and self.num_docks_disabled == other.num_docks_disabled
+				and self.is_installed == other.is_installed
+				and self.is_renting == other.is_renting
+				and self.is_returning == other.is_returning
+				and self.last_reported == other.last_reported):
+			#if all these values are the same, return false
+			return False
+		else: 
+			return True
+
 
 class Station_Information(Dimension, Base):
 	'''
