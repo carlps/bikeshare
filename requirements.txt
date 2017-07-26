@@ -6,4 +6,5 @@ packaging==16.8
 pyparsing==2.2.0
 requests==2.16.4
 six==1.10.0
+SQLAlchemy==1.1.11
 urllib3==1.21.1

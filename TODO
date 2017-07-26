@@ -1,51 +1,42 @@
 TODO
 
-Classes. AKA Models.
-x- probably should just send data into model
-x- and do all unpacking + MD5 in there.
-x- as_list should be class method instead of attr?
-    --it will save space and processing so yes.
-
-datasets:
-x- system_regions
-x- station_information
-    x-test update/delete and should be good
-!- station_status
-    x- full load
-    x!- cdc/stream load
-        x-TEST
-    x- view (max last_updated group by ID)
-        SELECT MAX(last_updated), station_id, ...
-        FROM station_status
-        GROUP BY station_id
-
-X fix set_station_md5
-
-X- control table
-    x-change start/end to decimal
-!- unit tests
-!- rollback on error
-
-clean up code.
-    in models.__init__ can you make import * import *.*?
-        ex: instead of from models.system_regions import System_Region, etc
-            would rather just from models import *
-
 sqlalchemy
+    --convert to datetimes to datetime
+    --bikeshare_etl:
+        x-compare
+        x-update_old
+        x-load
+        x-metadata
+    x-cdc
+        --TEST!
+
+run.py file which runs bikeshare_etl for specific set, cdc, etc.
+
+X models all in one file models.py
+    x-can remove to_lists?
+    x-metadata class?
+    x-maybe a parent class (like Record?) that has base attributes? (to clean: if model==...)
+        x-maybe parent dimension or dim?
+        x-parent set_md5
 
 
 station status might be better for mongodb?
 
+*args, **kwargs?
+
 
 X-python 3.6
+    --PEP8
 
-unit tests
+! unit tests
 
 tests:
 -insert on empty db
 -compare IUD
 -empty file
 -views are correct
+-all deletes?
+-can get data and create obj
 
 What happens when I, D, and then new? Probably a new I, right?
 
@@ -58,3 +49,5 @@ make a utils lib with things like:
         fname = os.path.join(os.getcwd(),file)
         fname_bkp = f'{fname}.bkp'
         return shutil.copyfile(fname,fname_bkp)
+
+    get_data(dataset) returning json for dataset could be good
