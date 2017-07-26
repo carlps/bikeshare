@@ -18,7 +18,6 @@ X models all in one file models.py
     x-maybe a parent class (like Record?) that has base attributes? (to clean: if model==...)
         x-maybe parent dimension or dim?
         x-parent set_md5
-        --class like Latest_System_Region(System_Region): __tablename__ = 'view'
 
 
 station status might be better for mongodb?
@@ -50,3 +49,5 @@ make a utils lib with things like:
         fname = os.path.join(os.getcwd(),file)
         fname_bkp = f'{fname}.bkp'
         return shutil.copyfile(fname,fname_bkp)
+
+    get_data(dataset) returning json for dataset could be good
