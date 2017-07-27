@@ -31,6 +31,22 @@ class Dimension():
 
 		return hashlib.md5(str.encode(record_string)).hexdigest()
 
+	def set_optional(self, attribute_str):
+		''' if a attribute is optional, check if the key is in 
+			the dict. If yes, set. If no, set to None '''
+
+		if attribute_str in self.record.keys():
+			return self.record[attribute_str]
+		else:
+			return None
+
+	def __repr__(self):
+		repr_str = f'<{type(self).__name__}(\n'
+		for key in self.__dict__.keys():
+			if key not in ['_sa_instance_state','record']:
+				repr_str += f'\t{key}={self.__dict__[key]}\n'
+		repr_str += ')>'
+		return repr_str
 
 
 class Station_Status(Base):
@@ -192,7 +208,7 @@ class Station_Information(Dimension, Base):
 
 		region_md5 is calculated using the hashlib md5
 
-		any fields that aren't require use set_[] to prevent KeyError
+		any fields that aren't require use set_optional to prevent KeyError
 		'''
 
 		self.record = record
@@ -204,39 +220,14 @@ class Station_Information(Dimension, Base):
 		self.lat = record['lat']
 		self.lon = record['lon']
 		
-		# optional fields use set_
-		self.set_short_name()
-		self.set_region_id()
-		self.set_capacity()
-		self.set_eightd_has_key_dispenser()
+		# optional fields use set_optional (from parent)
+		self.short_name = self.set_optional('short_name')
+		self.region_id = self.set_optional('region_id')
+		self.capacity = self.set_optional('capacity')
+		self.eightd_has_key_dispenser = self.set_optional('eightd_has_key_dispenser')
 		self.unpack_rental_methods()
 
-		# calculate md5
 		self.station_md5 = self.set_md5(record)
-
-	def set_short_name(self):
-		try:
-			self.short_name = self.record['short_name']
-		except KeyError:
-			self.short_name = None
-
-	def set_region_id(self):
-		try:
-			self.region_id = self.record['region_id']
-		except KeyError:
-			self.region_id = None
-
-	def set_capacity(self):
-		try:
-			self.capacity = self.record['capacity']
-		except KeyError:
-			self.capacity = None
-
-	def set_eightd_has_key_dispenser(self):
-		try:
-			self.eightd_has_key_dispenser = self.record['eightd_has_key_dispenser']
-		except KeyError:
-			self.eightd_has_key_dispenser = None
 
 
 	def unpack_rental_methods(self):
@@ -286,30 +277,6 @@ class Station_Information(Dimension, Base):
 		else:
 			self.rental_method_PHONE = False
 
-	def __repr__(self):
-		return ('<System_Information(\n'
-		f'last_updated={self.last_updated},\n'
-		f'\tstation_id={self.station_id},\n'
-		f'\tshort_name={self.short_name},\n'
-		f'\tname={self.name},\n'
-		f'\tlat={self.lat},\n'
-		f'\tlon={self.lon},\n'
-		f'\tcapacity={self.capacity},\n'
-		f'\tregion_id={self.region_id},\n'
-		f'\teightd_has_key_dispenser={self.eightd_has_key_dispenser},\n'
-		f'\trental_method_KEY={self.rental_method_KEY},\n'
-		f'\trental_method_CREDITCARD={self.rental_method_CREDITCARD},\n'
-		f'\trental_method_PAYPASS={self.rental_method_PAYPASS},\n'
-		f'\trental_method_APPLEPAY={self.rental_method_APPLEPAY},\n'
-		f'\trental_method_ANDROIDPAY={self.rental_method_ANDROIDPAY},\n'
-		f'\trental_method_TRANSITCARD={self.rental_method_TRANSITCARD},\n'
-		f'\trental_method_ACCOUNTNUMBER={self.rental_method_ACCOUNTNUMBER},\n'
-		f'\trental_method_PHONE={self.rental_method_PHONE},\n'
-		f'\tstation_md5={self.station_md5},\n'
-		f'\ttranstype={self.transtype},\n'
-		f'\tlatest_row_ind={self.latest_row_ind}'
-		')>')
-
 
 class System_Region(Dimension,Base):
 	'''
@@ -350,11 +317,6 @@ class System_Region(Dimension,Base):
 		self.region_id = int(record['region_id']) # convert region_id to int
 		self.name = record['name']
 		self.region_md5 = self.set_md5(record)
-
-	def __repr__(self):
-		return (f'<System_Region(last_updated={self.last_updated}, '
-				f'region_id={self.region_id}, name={self.name}, '
-				f'region_md5={self.region_md5})>')
 
 
 class Load_Metadata(Base):
