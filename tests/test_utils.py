@@ -6,7 +6,7 @@ import unittest
 
 from sqlalchemy.orm.session import Session
 
-from utils import get_session
+from src.utils import get_session
 
 class UtilsTestCase(unittest.TestCase):
 
@@ -14,5 +14,3 @@ class UtilsTestCase(unittest.TestCase):
 		self.assertTrue(isinstance(get_session(),Session))
 		
 
-def run():
-	unittest.main()
