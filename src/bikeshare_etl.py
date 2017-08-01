@@ -231,11 +231,11 @@ def load_data(data, model, metadata):
 	metadata.end_time = time.time()
 	session.add(metadata)
 	session.commit()
-	session.close()
-
+	# print before closing connection or else metadata will except
 	print(f'{model.__name__}: load done. loaded {len(batch)} records.'
 		  f'\nsee table load_metadata, '
 		  f'last_updated {metadata.last_updated_tstmp} for details')
+	session.close()
 
 def etl(model):
 	'''
