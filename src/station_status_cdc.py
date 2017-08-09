@@ -86,8 +86,7 @@ def load_db(out, session):
 		make_transient(record)
 
 
-def station_status_cdc():
-	session = get_session(echo=True)
+def station_status_cdc(session):
 	db_data = get_latest_from_db(session)
 	nextFileTstmp = 0
 	lastFileTstmp = 0
@@ -159,13 +158,14 @@ def station_status_cdc():
 				print(f'sleeping {nextFileTstmp-time()} til next update')
 				sleep(nextFileTstmp-time())
 		except KeyboardInterrupt:
-			session.close()
-			print('\nsession closed')
 			break
 
 
 def main():
-	station_status_cdc()
+	session = get_session('bikeshare.db')
+	station_status_cdc(session)
+	session.close()
+	print('\nokay session closed')
 
 
 if __name__ == '__main__':

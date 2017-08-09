@@ -4,7 +4,7 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-def get_session(echo=False):
+def get_session(db, echo=False):
 	'''
 	create db connection and sqlalchemy engine
 	return a session to interact with db
@@ -15,7 +15,7 @@ def get_session(echo=False):
 	'''
 	# grab the folder where this script lives
 	basedir = os.path.abspath(os.path.dirname(__file__))
-	DATABASE = 'bikeshare.db'
+	DATABASE = db
 	# define the full path for the database
 	DATABASE_PATH = os.path.join(basedir, DATABASE)
 

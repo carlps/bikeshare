@@ -4,3 +4,4 @@ __pycache__
 scratch
 *.bkp
 test_out
+test.db

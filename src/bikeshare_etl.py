@@ -18,8 +18,8 @@ import os
 
 from sqlalchemy.orm import make_transient
 
-from models import Station_Status, Station_Information, System_Region, Dimension, Load_Metadata
-from utils import get_session	
+from .models import Station_Status, Station_Information, System_Region, Dimension, Load_Metadata
+from .utils import get_session	
 
 def get_data(model, metadata):
 	'''
@@ -78,7 +78,7 @@ def get_data(model, metadata):
 	# return list of objects
 	return data
 
-def compare_data(data,model,metadata):
+def compare_data(data,model,metadata,session):
 	'''
 	lookup the data in sql
 	if db data exists in new data but doesn't match: update
@@ -89,18 +89,8 @@ def compare_data(data,model,metadata):
 	if nothing in db data: insert all
 	'''
 
-
-	# quick check to ensure correct model
-	if model not in (System_Region,Station_Information):
-		print('only works for system regions and station information. \
-			   did you mess something up')
-		return
-
 	# get a list of row_ids to be used in comparison
 	row_ids = [row.id for row in data]
-
-	# connect to db
-	session = get_session()
 
 	# get all ids and md5s with matching ids
 	# filter for latest, non-deleted rows
@@ -112,16 +102,6 @@ def compare_data(data,model,metadata):
 						filter(model.transtype != 'D').\
 						all():
 		matches[id] = md5
-	
-	# quick check - if matches has 0, set all records to inserts and return
-	if len(matches) == 0:
-		for row in data:
-			row.set_transtype_and_latest('I','Y')
-		metadata.inserts = len(data)
-		metadata.updates = 0
-		metadata.deletes = 0
-		print(f'{model.__name__}: all new records. {len(data)} inserts')
-		return {'inserts':data,'updates':[],'updates_old':[],'deletes':[]}
 
 	# we want whole records for deletes so we can insert D
 	# filter for region_id not in (note ~ in row_id.in_)
@@ -130,6 +110,18 @@ def compare_data(data,model,metadata):
 						filter(model.latest_row_ind == 'Y').\
 						filter(model.transtype != 'D').\
 						all()
+
+	# quick check - if no matches or deletes, 
+	# set all records to inserts and return
+	if len(matches) == 0 and len(deletes) == 0:
+		for row in data:
+			row.set_transtype_and_latest('I','Y')
+		metadata.inserts = len(data)
+		metadata.updates = 0
+		metadata.deletes = 0
+		print(f'{model.__name__}: all new records. {len(data)} inserts')
+		return {'inserts':data,'updates':[],'updates_old':[],'deletes':[]}
+
 	for row in deletes:
 		# in order to prevent update when we want to insert a copy,
 		# we have to expunge and make_transient delete rows
@@ -138,13 +130,10 @@ def compare_data(data,model,metadata):
 		# then update transtype and latest_row_ind (see parent class Dimension)
 		row.set_transtype_and_latest('D','Y')
 
-	session.close()
-
 	# pull last_updated from a row to use for deletes
 	last_updated = data[0].last_updated
 	for deleted_row in deletes:
 		deleted_row.last_updated = last_updated
-	
 
 	# if id is not in matches, then it is a brand new record
 	inserts = []
@@ -158,15 +147,18 @@ def compare_data(data,model,metadata):
 	# empty lists to fill in for updates
 	updates = []
 	updates_old = []
-	for row in data:
-		# if md5s don't match, then the record has been updated
-		if row.md5 != matches[row.id]:
-			# tuple (id,md5) to update the old record to latest_row_ind=N
-			updates_old.append((row.id,matches[row.id]))
 
-			# whole new row to insert as latest, updated record
-			row.set_transtype_and_latest('U','Y')
-			updates.append(row)
+	# handle updates IF we have any matches
+	if len(matches) > 0:	
+		for row in data:
+			# if md5s don't match, then the record has been updated
+			if row.md5 != matches[row.id]:
+				# tuple (id,md5) to update the old record to latest_row_ind=N
+				updates_old.append((row.id,matches[row.id]))
+
+				# whole new row to insert as latest, updated record
+				row.set_transtype_and_latest('U','Y')
+				updates.append(row)
 	
 	# update metadata
 	metadata.inserts = len(inserts)
@@ -178,16 +170,11 @@ def compare_data(data,model,metadata):
 
 	return({'inserts':inserts,'updates':updates,'updates_old':updates_old,'deletes':deletes})
 
-def update_old(data,model):
+def update_old(data,model,session):
 	'''
 	before inserting records that are U or D
 	update the old version to set latest_row_ind = 'N'
 	'''
-	# ensure only correct models are passed
-	if model not in (System_Region,Station_Information):
-		print('only works for system regions and station information. \
-			   did you mess something up')
-		return
 
 	# if no deletes or updates, nothing to do here
 	if len(data['deletes'] + data['updates_old']) == 0:
@@ -199,16 +186,14 @@ def update_old(data,model):
 	md5s += [rec[-1] for rec in data['updates_old']] # these are tuples with (id,md5)
 
 	# use md5 to update old records
-	session = get_session()
 	session.query(model).\
 			filter(model.md5.in_(md5s)).\
 			update({model.latest_row_ind:'N'},synchronize_session='fetch')
 	session.commit()
-	session.close()
 
 	print(f'{model.__name__}: updated {len(md5s)} old records.')
 
-def load_data(data, model, metadata):
+def load_data(data, model, metadata, session):
 	'''
 	load data into db
 	data should be dict of lists of objects
@@ -216,28 +201,21 @@ def load_data(data, model, metadata):
 	dict keys must be 'inserts', 'updates', and 'deletes'
 	'''
 	
-	# quick check to ensure correct model
-	if model not in (System_Region,Station_Information):
-		print('only works for system regions and station information. \
-			   did you mess something up')
-		return
-
 	# combine all records into one batch
 	batch = data['inserts'] + data['updates'] + data['deletes']
 
 	# insert batch into db
-	session = get_session()
 	session.add_all(batch)
 	metadata.end_time = time.time()
 	session.add(metadata)
 	session.commit()
-	# print before closing connection or else metadata will except
+
 	print(f'{model.__name__}: load done. loaded {len(batch)} records.'
 		  f'\nsee table load_metadata, '
 		  f'last_updated {metadata.last_updated_tstmp} for details')
-	session.close()
+	
 
-def etl(model):
+def etl(model,session):
 	'''
 	get data, transform, update old if needed, insert new
 	'''
@@ -247,21 +225,25 @@ def etl(model):
 	# instantiate metadata object
 	metadata = Load_Metadata(table_name)
 
+	# get data from API
 	data = get_data(model, metadata)
 	
 	# for dimensions, we have to compare and update old
 	if issubclass(model,Dimension):
-		data = compare_data(data, model, metadata)
+		data = compare_data(data, model, metadata, session)
 		if((len(data['inserts'])+len(data['updates'])+len(data['deletes'])) == 0):
 			print('no data to insert, update, or delete.')
 			return
-		update_old(data,model)
-
-	load_data(data,model,metadata)
+		update_old(data,model,session)
+	else:
+		print(f'{model} is not subclass of Dimension')
+	load_data(data,model,metadata,session)
 
 def main():
-	etl(Station_Information)
-	etl(System_Region)
+	session = get_session(db='bikeshare.db')
+	etl(Station_Information,session)
+	etl(System_Region,session)
+	session.close()
 	#etl('station_status')
 
 
