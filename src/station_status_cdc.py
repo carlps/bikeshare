@@ -124,7 +124,7 @@ def station_status_cdc(session):
 					if len(out) > 0: # if we have records to output
 						load_db(out,session)
 						# for testing, write out json to file:
-						with open(f'cdc_test/test_out/{new_data["last_updated"]}.json',
+						with open(f'src/cdc_test/test_out/{new_data["last_updated"]}.json',
 									'w') as outfile:
 							json.dump(new_data,outfile)
 
