@@ -5,11 +5,8 @@ tests.test_system_regions
 import unittest
 import os
 from time import time
-from random import randint
 
-
-from sqlalchemy import create_engine, delete
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import delete
 
 from src.bikeshare_etl import get_data, compare_data, update_old, load_data, etl
 from src.models import Load_Metadata, System_Region
@@ -27,7 +24,7 @@ SESSION = get_session(DATABASE, echo=True)
 ##########################
 
 def setUp():
-	return
+	empty_db()
 
 def tearDown():
 	empty_db()
@@ -43,7 +40,6 @@ def load_db_dummy_data(dummy):
 	# insert test data into db
 	SESSION.add(dummy)
 	SESSION.commit()
-	print('loaded db')
 
 def empty_db():
 	# empty test db
@@ -77,14 +73,17 @@ def do_all_through_update_old():
 	return data
 
 def do_all_through_load_data():
-	data = do_all_through_update_old()
 	metadata = get_dummy_metadata()
+	data = get_data(System_Region,metadata)
+	data = compare_data(data,System_Region,
+						metadata,SESSION)
+	update_old(data,System_Region,SESSION)
 	load_data(data,System_Region,metadata,SESSION)
 
 
 def get_dummy_metadata():
 	m = Load_Metadata(System_Region.__tablename__)
-	m.last_updated_tstmp = randint(1,1000)
+	m.last_updated_tstmp = time()
 	return m
 
 #############
@@ -183,6 +182,24 @@ class SystemRegionTestCase(unittest.TestCase):
 		self.assertEqual(untouched,loaded)
 		empty_db()
 
+	def test_load_data_System_Region_insert_metadata(self):
+		''' just pull down, compare, and load on empty db 
+			keep a copy of pulled down before comparison
+			set transtype and latest, then compare to loaded
+			should be same'''
+		data = do_all_through_get_data()
+		inserts = len(data)
+		metadata = get_dummy_metadata()
+		data = compare_data(data,System_Region,metadata,SESSION)
+		update_old(data,System_Region,SESSION)
+		load_data(data,System_Region,metadata,SESSION)
+
+		meta = SESSION.query(Load_Metadata).first()
+		self.assertTrue(inserts == meta.inserts and 
+						meta.updates == 0 and 
+						meta.deletes == 0)
+		empty_db()
+
 	def test_load_data_system_region_update(self):
 		''' load data, then pull down data and
 			edit a record before comparison'''
@@ -205,6 +222,28 @@ class SystemRegionTestCase(unittest.TestCase):
 		self.assertEqual(updated.id,original.id)
 		empty_db()
 
+	def test_load_data_System_Region_update_metadata(self):
+		''' load data, then pull down data and
+			edit a record before comparison'''
+		do_all_through_load_data()
+		data = do_all_through_get_data()
+		data[0].md5 = 'i changed'
+		data[0].last_updated = 987654321
+		metadata = get_dummy_metadata()
+		tstmp = metadata.last_updated_tstmp
+		data = compare_data(data,System_Region,metadata,SESSION)
+		update_old(data,System_Region,SESSION)
+		load_data(data,System_Region,metadata,SESSION)
+
+		meta = SESSION.query(Load_Metadata).\
+						filter(Load_Metadata.last_updated_tstmp == \
+							tstmp).first()
+
+		self.assertTrue(meta.inserts == 0 and 
+						meta.updates == 1 and 
+						meta.deletes == 0)
+		empty_db()
+
 	def test_load_data_system_region_delete(self):
 		'''	put dummy record in db, then run full load
 			get deleted from db, should be same as dummy
@@ -217,7 +256,18 @@ class SystemRegionTestCase(unittest.TestCase):
 		dummy.set_transtype_and_latest('D','Y')
 		self.assertEqual(dummy,deleted)
 		empty_db()
-		
+
+	def test_load_data_System_Region_delete_metadata(self):
+		'''	put dummy record in db, then run full load
+			get deleted from db, should be same as dummy
+			but transtype = D and latest = Y '''
+		dummy = create_dummy_region()
+		load_db_dummy_data(dummy)
+		do_all_through_load_data()
+		meta = SESSION.query(Load_Metadata).first()
+		self.assertTrue(meta.updates == 0 and 
+						meta.deletes == 1)
+		empty_db()			
 
 	def test_etl_system_region(self):
 		''' run full etl process for System Region '''
@@ -241,7 +291,27 @@ class SystemRegionTestCase(unittest.TestCase):
 		t1 = create_dummy_region()
 		self.assertIsNotNone(t1.md5)
 
+	def test_metadata_time_system_region(self):
+		''' end time should be > start time'''
+		etl(System_Region,SESSION)
+		meta = SESSION.query(Load_Metadata).first()
+		self.assertTrue(meta.start_time < meta.end_time)
+		empty_db()
 
+	def test_metadata_dataset_system_region(self):
+		''' dataset should be tablename'''
+		etl(System_Region,SESSION)
+		meta = SESSION.query(Load_Metadata).first()
+		self.assertEqual(meta.dataset,'system_regions')
+		empty_db()
+
+	def test_metadata_last_updated_system_region(self):
+		''' last updated from metadata should match loaded data'''
+		etl(System_Region,SESSION)
+		lkp = SESSION.query(System_Region).first()
+		meta = SESSION.query(Load_Metadata).first()
+		self.assertEqual(meta.last_updated_tstmp,lkp.last_updated)
+		empty_db()
 
 if __name__ == '__main__':
 	unittest.main()
