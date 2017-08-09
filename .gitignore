@@ -5,3 +5,5 @@ scratch
 *.bkp
 test_out
 test.db
+*.sublime-project
+*.sublime-workspace

@@ -51,7 +51,7 @@ def empty_db():
 	SESSION.query(Load_Metadata).delete()
 	SESSION.commit()
 
-def create_dummy_records(name='test_region'):
+def create_dummy_region(name='test_region'):
 	sr = {'last_updated':12345,'region_id':'9999','name':name}
 	sr = System_Region(sr)
 	sr.set_transtype_and_latest('I','Y')
@@ -91,7 +91,7 @@ def get_dummy_metadata():
 ### Tests ###
 #############
 
-class EtlTestCase(unittest.TestCase):
+class SystemRegionTestCase(unittest.TestCase):
 
 	def test_get_data_system_region(self):
 		''' ensure we get a list of System_Regions back '''
@@ -116,7 +116,7 @@ class EtlTestCase(unittest.TestCase):
 			then pull down data and compare, 
 			dummy should be marked as D 
 		'''
-		dummy = create_dummy_records()
+		dummy = create_dummy_region()
 		load_db_dummy_data(dummy)
 		data = do_all_through_compare_data()
 		self.assertEqual(data['deletes'][0].region_id,dummy.region_id)
@@ -209,7 +209,7 @@ class EtlTestCase(unittest.TestCase):
 		'''	put dummy record in db, then run full load
 			get deleted from db, should be same as dummy
 			but transtype = D and latest = Y '''
-		dummy = create_dummy_records()
+		dummy = create_dummy_region()
 		load_db_dummy_data(dummy)
 		do_all_through_load_data()
 		deleted = SESSION.query(System_Region).\
@@ -227,16 +227,19 @@ class EtlTestCase(unittest.TestCase):
 		empty_db()
 
 	def test_System_Region_set_transtype_and_latest(self):
-		dummy = create_dummy_records()
+		dummy = create_dummy_region()
 		dummy.set_transtype_and_latest('X','Z')
 		t_l = (dummy.transtype,dummy.latest_row_ind)
 		self.assertEqual(t_l,('X','Z'))
 
 	def test_System_Region_set_md5(self):
-		t1 = create_dummy_records(name="test1")
-		t2 = create_dummy_records(name="test2")
+		t1 = create_dummy_region(name="test1")
+		t2 = create_dummy_region(name="test2")
 		self.assertNotEqual(t1.md5,t2.md5)
 
+	def test_System_Region_init_md5(self):
+		t1 = create_dummy_region()
+		self.assertIsNotNone(t1.md5)
 
 
 
