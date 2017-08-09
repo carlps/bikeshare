@@ -136,13 +136,16 @@ def compare_data(data,model,metadata,session):
 		deleted_row.last_updated = last_updated
 
 	# if id is not in matches, then it is a brand new record
+	
 	inserts = []
 	for row in data:
 		if row.id not in matches:
 			# mark it as insert and latest
 			row.set_transtype_and_latest('I','Y')
-			# use pop to remove from data list
-			inserts.append(data.pop(data.index(row)))
+			inserts.append(row)
+	# remove inserts from data list
+	for i in inserts:
+		del(data[data.index(i)])
 
 	# empty lists to fill in for updates
 	updates = []

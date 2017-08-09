@@ -1,4 +1,4 @@
-#station_status_cdc.py
+''' src.station_status_cdc '''
 
 import json #temp for test files
 import requests
@@ -8,8 +8,8 @@ from sqlalchemy import and_
 from sqlalchemy.sql import func
 from sqlalchemy.orm import make_transient
 
-from utils import get_session
-from models import Station_Status
+from .utils import get_session
+from .models import Station_Status
 
 
 def get_latest_from_db(session):
@@ -57,8 +57,8 @@ def get_data_from_api():
 	return response.json()
 
 
-def write_log(message):
-	with open('cdc_log.txt','a') as file:
+def write_log(message,logfile='cdc_log.txt'):
+	with open(logfile,'a') as file:
 		file.write(f'{message}\t||\t{(strftime("%c"))}\n')
 
 
@@ -116,7 +116,7 @@ def station_status_cdc(session):
 												  latest_data=db_data)
 
 						# if rows are different
-						if (new_obj.is_different(old_obj)):
+						if (new_obj != old_obj):
 							# add new to out and replace old in latest
 							add_to_out_and_latest(new_row=new_obj,
 												  out=out,

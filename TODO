@@ -12,7 +12,15 @@ sqlalchemy
 
 
 ! unit tests
-    --make an empty copy of db for testing
+    x-make an empty copy of db for testing
+    x-system regions
+        x-metadata
+    x-station information
+        x-metadata
+    --cdc
+
+! pep8/lint
+
 
 
 tests:
@@ -32,7 +40,7 @@ run.py file which runs bikeshare_etl for specific set, cdc, etc.
 
 absolute references
 
-pep8/lint
+
 
 station status might be better for mongodb?
 

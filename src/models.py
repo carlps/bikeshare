@@ -95,7 +95,7 @@ class Station_Status(Base):
 		self.record = record
 
 		self.last_updated = record['last_updated']
-		self. station_id = int(record['station_id'])
+		self.station_id = int(record['station_id'])
 		self.num_bikes_available = record['num_bikes_available']
 		self.num_docks_available = record['num_docks_available']
 		self.is_installed = bool(record['is_installed'])
@@ -133,25 +133,20 @@ class Station_Status(Base):
             f'\tlast_reported={self.last_reported},\n'
             ')>')
 
-	def is_different(self,other):
-		'''
-		compare this record with another record
-		based on all attributes besides last_reported and station_id
+	def __eq__(self,other):
+		''' override equals operator to just
+			see if non-date values match'''
+		return (self.num_bikes_available == other.num_bikes_available
+		and self.num_bikes_disabled == other.num_bikes_disabled
+		and self.num_docks_available == other.num_docks_available
+		and self.num_docks_disabled == other.num_docks_disabled
+		and self.is_installed == other.is_installed
+		and self.is_renting == other.is_renting
+		and self.is_returning == other.is_returning
+		and self.last_reported == other.last_reported)
 
-		return true if the records don't match or false if they are the same
-		'''
-		if (self.num_bikes_available == other.num_bikes_available
-				and self.num_bikes_disabled == other.num_bikes_disabled
-				and self.num_docks_available == other.num_docks_available
-				and self.num_docks_disabled == other.num_docks_disabled
-				and self.is_installed == other.is_installed
-				and self.is_renting == other.is_renting
-				and self.is_returning == other.is_returning
-				and self.last_reported == other.last_reported):
-			#if all these values are the same, return false
-			return False
-		else: 
-			return True
+	def __ne__(self,other):
+		return not self.__eq__(other)
 
 
 class Station_Information(Dimension, Base):
