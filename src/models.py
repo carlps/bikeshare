@@ -1,8 +1,12 @@
+# src.models
+
 import hashlib
 import time
+from datetime import datetime
 
 import sqlalchemy
-from sqlalchemy import Column, Integer, Text, Numeric, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, Text, Numeric, DateTime
+from sqlalchemy import Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, synonym
 
@@ -16,37 +20,27 @@ class Dimension():
         self.transtype = transtype
         self.latest_row_ind = latest
 
-    def set_md5(self, record):
-        ''' Record is a dictionary instance of an object.
-            With the exception of last_updated, convert all attributes to
-            string, and concatenate all into one string with no delimiter.
-            Returns md5 hash of string of attributes '''
+    def set_tstmps(self):
+        ''' If a new record, set both timestamps to now.
+            If an update, set row_update to now and leave
+            row insert alone.'''
+        if self.row_update_tstmp:
+            # if the tstmp already has value, then we are updating
+            self.row_update_tstmp = datetime.now()
+        else:
+            # if not, then set both to now
+            self.row_insert_tstmp = datetime.now()
+            self.row_update_tstmp = self.row_insert_tstmp
 
-        record_string = ''
-
-        for key in record.keys():
-            if key != 'last_updated':
-                record_string += str(record[key])
-
-        return hashlib.md5(str.encode(record_string)).hexdigest()
-
-    def set_optional(self, attribute_str):
+    def set_optional(self, attribute_str, record):
         ''' if a attribute is optional, check if the
             key is in the dict. If yes, set.
             If no, set to None '''
 
-        if attribute_str in self.record.keys():
-            return self.record[attribute_str]
+        if attribute_str in record:
+            return record[attribute_str]
         else:
             return None
-
-    def __repr__(self):
-        repr_str = f'<{type(self).__name__}(\n'
-        for key in self.__dict__.keys():
-            if key not in ['_sa_instance_state', 'record']:
-                repr_str += f'\t{key}={self.__dict__[key]}\n'
-        repr_str += ')>'
-        return repr_str
 
 
 class Station_Status(Base):
@@ -60,7 +54,7 @@ class Station_Status(Base):
 
     __tablename__ = 'station_status'
 
-    last_updated = Column(Integer, primary_key=True)
+    last_updated = Column(DateTime, primary_key=True)
     station_id = Column(Integer,
                         ForeignKey('station_information.station_id'),
                         primary_key=True)
@@ -71,10 +65,13 @@ class Station_Status(Base):
     is_installed = Column(Boolean)
     is_renting = Column(Boolean)
     is_returning = Column(Boolean)
-    last_reported = Column(Integer)
+    last_reported = Column(DateTime)
 
     station_information = relationship("Station_Information",
                                        back_populates='station_statuses')
+
+    # set unique constraint for primary key cols
+    UniqueConstraint(last_updated, station_id, name="station_status_pk_unique")
 
     def __init__(self, record):
         ''' record should be a dict with the following keys:
@@ -158,27 +155,30 @@ class Station_Information(Dimension, Base):
 
     __tablename__ = 'station_information'
 
-    last_updated = Column(Integer, primary_key=True)
-    station_id = Column(Integer, primary_key=True)
+    station_id = Column(Integer,
+                        primary_key=True,
+                        unique=True,
+                        autoincrement=False)
     short_name = Column(Text)
     name = Column(Text)
     lat = Column(Numeric)
     lon = Column(Numeric)
     capacity = Column(Integer)
     region_id = Column(Integer, ForeignKey('system_regions.region_id'))
-    eightd_has_key_dispenser = Column(Numeric)
-    rental_method_KEY = Column(Boolean)
-    rental_method_CREDITCARD = Column(Boolean)
-    rental_method_PAYPASS = Column(Boolean)
-    rental_method_APPLEPAY = Column(Boolean)
-    rental_method_ANDROIDPAY = Column(Boolean)
-    rental_method_TRANSITCARD = Column(Boolean)
-    rental_method_ACCOUNTNUMBER = Column(Boolean)
-    rental_method_PHONE = Column(Boolean)
-    station_md5 = Column(Text)
-    transtype = Column(Text)
-    latest_row_ind = Column(Text)
+    eightd_has_key_dispenser = Column(Boolean)
+    rental_method_key = Column(Boolean)
+    rental_method_creditcard = Column(Boolean)
+    rental_method_paypass = Column(Boolean)
+    rental_method_applepay = Column(Boolean)
+    rental_method_androidpay = Column(Boolean)
+    rental_method_transitcard = Column(Boolean)
+    rental_method_accountnumber = Column(Boolean)
+    rental_method_phone = Column(Boolean)
+    row_insert_tstmp = Column(DateTime)
+    row_update_tstmp = Column(DateTime)
+    load_id = Column(Integer, ForeignKey('load_metadata.load_id'))
 
+    load = relationship("Load_Metadata", back_populates='stations')
     region = relationship("System_Region", back_populates='stations')
     station_statuses = relationship("Station_Status",
                                     order_by=Station_Status.last_updated,
@@ -186,83 +186,54 @@ class Station_Information(Dimension, Base):
 
     # create sqlalchemy synonyms to lookup easier
     id = synonym("station_id")
-    md5 = synonym("station_md5")
 
     def __init__(self, record):
-        ''' record should be a dict with the following keys:
-            last_updated, station_id, name, short_name, lat, lon, region_id,
-            rental_methods, capacity, eightd_has_key_dispenser
+        ''' Record should be a dict with the following keys:
+            station_id, name, lat, lon.
+            The following are optional dict keys:
+            short_name, region_id, capacity, eightd_has_key_dispenser '''
 
-            region_md5 is calculated using the hashlib md5
-
-            any fields that aren't require use set_optional
-            to prevent KeyError '''
-
-        self.record = record
-
-        self.last_updated = record['last_updated']
-        # convert id to int
         self.station_id = int(record['station_id'])
         self.name = record['name']
         self.lat = record['lat']
         self.lon = record['lon']
-
-        # optional fields use set_optional (from parent)
-        self.short_name = self.set_optional('short_name')
-        self.region_id = self.set_optional('region_id')
-        self.capacity = self.set_optional('capacity')
+        self.short_name = self.set_optional('short_name', record)
+        self.region_id = self.set_optional('region_id', record)
+        self.capacity = self.set_optional('capacity', record)
         self.eightd_has_key_dispenser = self.set_optional(
-            'eightd_has_key_dispenser')
-        self.unpack_rental_methods()
+            'eightd_has_key_dispenser', record)
+        self.unpack_rental_methods(record)
+        self.set_tstmps()
 
-        self.station_md5 = self.set_md5(record)
-
-    def unpack_rental_methods(self):
-        try:
-            self.rental_methods = self.record['rental_methods']
-        except KeyError:
+    def unpack_rental_methods(self, record):
+        if 'rental_methods' in record.keys():
+            rental_methods = record['rental_methods']
+            self.rental_method_key =\
+                'KEY' in rental_methods
+            self.rental_method_creditcard =\
+                'CREDITCARD' in rental_methods
+            self.rental_method_paypass =\
+                'PAYPASS' in rental_methods
+            self.rental_method_applepay =\
+                'APPLEPAY' in rental_methods
+            self.rental_method_androidpay =\
+                'ANDROIDPAY' in rental_methods
+            self.rental_method_transitcard =\
+                'TRANSITCARD' in rental_methods
+            self.rental_method_accountnumber =\
+                'ACCOUNTNUMBER' in rental_methods
+            self.rental_method_phone =\
+                'PHONE' in rental_methods
+        else:
             # if rental methods not in dict, set all as null
-            self.rental_method_KEY = None
-            self.rental_method_CREDITCARD = None
-            self.rental_method_PAYPASS = None
-            self.rental_method_APPLEPAY = None
-            self.rental_method_ANDROIDPAY = None
-            self.rental_method_TRANSITCARD = None
-            self.rental_method_ACCOUNTNUMBER = None
-            self.rental_method_PHONE = None
-        # more elegant way?
-        if 'KEY' in self.rental_methods:
-            self.rental_method_KEY = True
-        else:
-            self.rental_method_KEY = False
-        if 'CREDITCARD' in self.rental_methods:
-            self.rental_method_CREDITCARD = True
-        else:
-            self.rental_method_CREDITCARD = False
-        if 'PAYPASS' in self.rental_methods:
-            self.rental_method_PAYPASS = True
-        else:
-            self.rental_method_PAYPASS = False
-        if 'APPLEPAY' in self.rental_methods:
-            self.rental_method_APPLEPAY = True
-        else:
-            self.rental_method_APPLEPAY = False
-        if 'ANDROIDPAY' in self.rental_methods:
-            self.rental_method_ANDROIDPAY = True
-        else:
-            self.rental_method_ANDROIDPAY = False
-        if 'TRANSITCARD' in self.rental_methods:
-            self.rental_method_TRANSITCARD = True
-        else:
-            self.rental_method_TRANSITCARD = False
-        if 'ACCOUNTNUMBER' in self.rental_methods:
-            self.rental_method_ACCOUNTNUMBER = True
-        else:
-            self.rental_method_ACCOUNTNUMBER = False
-        if 'PHONE' in self.rental_methods:
-            self.rental_method_PHONE = True
-        else:
-            self.rental_method_PHONE = False
+            self.rental_method_key = None
+            self.rental_method_creditcard = None
+            self.rental_method_paypass = None
+            self.rental_method_applepay = None
+            self.rental_method_androidpay = None
+            self.rental_method_transitcard = None
+            self.rental_method_accountnumber = None
+            self.rental_method_phone = None
 
 
 class System_Region(Dimension, Base):
@@ -277,61 +248,70 @@ class System_Region(Dimension, Base):
 
     __tablename__ = 'system_regions'
 
-    last_updated = Column(Integer, primary_key=True)
-    region_id = Column(Integer, primary_key=True)
-    name = Column(Text)
-    region_md5 = Column(Text)
-    transtype = Column(Text)
-    latest_row_ind = Column(Text)
+    region_id = Column(Integer,
+                       primary_key=True,
+                       autoincrement=False,
+                       unique=True)
+    region_name = Column(Text)  # how to not null?
+    row_insert_tstmp = Column(DateTime)
+    row_update_tstmp = Column(DateTime)
+    load_id = Column(Integer, ForeignKey('load_metadata.load_id'))
 
     stations = relationship("Station_Information",
                             order_by=Station_Information.station_id,
                             back_populates='region')
+    load = relationship("Load_Metadata", back_populates='regions')
 
     # create sqlalchemy synonyms to lookup easier
     id = synonym("region_id")
-    md5 = synonym("region_md5")
 
     def __init__(self, record):
         ''' record should be a dict with the following keys:
-            last_updated, region_id, name
-
-            region_md5 is calculated using the hashlib md5 '''
-        self.last_updated = record['last_updated']
+            region_id, name '''
         self.region_id = int(record['region_id'])  # convert region_id to int
-        self.name = record['name']
-        self.region_md5 = self.set_md5(record)
+        self.region_name = record['name']
+        self.set_tstmps()
 
 
 class Load_Metadata(Base):
     ''' Control table used to capture metadata of a load.
         Instantiated with dataset name, the rest is set throughout
-        the load process. '''
+        the load process.
+        One-to-Many relationship with dimensions'''
 
     __tablename__ = 'load_metadata'
 
-    last_updated_tstmp = Column(Integer, primary_key=True)
-    dataset = Column(Text, primary_key=True)
-    start_time = Column(Numeric)
-    end_time = Column(Numeric)
+    load_id = Column(Integer, primary_key=True, unique=True)
+    dataset = Column(Text)
+    start_tstmp = Column(DateTime)
+    end_tstmp = Column(DateTime)
     inserts = Column(Integer)
     updates = Column(Integer)
-    deletes = Column(Integer)
+
+    regions = relationship("System_Region",
+                           order_by=System_Region.region_id,
+                           back_populates='load')
+
+    stations = relationship("Station_Information",
+                            order_by=Station_Information.station_id,
+                            back_populates="load")
 
     def __init__(self, dataset):
         ''' a new metadata record should be
             instantiated with the name of the dataset
             start time will be inserted automatically '''
         self.dataset = dataset
-        self.start_time = time.time()
+        self.start_tstmp = datetime.now()
+        self.end_tstmp = None
+        self.inserts = None
+        self.updates = None
 
     def __repr__(self):
         return ('<Load_Metadata(\n'
-                f'last_updated_tstmp={self.last_updated_tstmp},\n'
+                f'load_id={self.load_id}\n'
                 f'dataset={self.dataset}\n'
-                f'start_time={self.start_time}\n'
-                f'end_time={self.end_time}\n'
+                f'start_tstmp={self.start_tstmp}\n'
+                f'end_tstmp={self.end_tstmp}\n'
                 f'inserts={self.inserts}\n'
                 f'updates={self.updates}\n'
-                f'deletes={self.deletes}\n'
                 ')>')

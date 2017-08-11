@@ -159,7 +159,7 @@ def station_status_cdc(session):
 
 
 def main():
-    session = get_session('bikeshare.db')
+    session = get_session()
     station_status_cdc(session)
     session.close()
     print('\nokay session closed')

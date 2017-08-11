@@ -1,25 +1,12 @@
 TODO
 
-sqlalchemy
-    --convert to datetimes to datetime
-    --bikeshare_etl:
-        x-compare
-        x-update_old
-        x-load
-        x-metadata
-    x-cdc
-        --TEST!
+
+postgres
+    - load failing?
+    - create test db
 
 
-! unit tests
-    x-make an empty copy of db for testing
-    x-system regions
-        x-metadata
-    x-station information
-        x-metadata
-    --cdc
 
-! pep8/lint
 
 
 
@@ -34,11 +21,6 @@ tests:
 *args, **kwargs?
 
 What happens when I, D, and then new? Probably a new I, right?
-
-
-run.py file which runs bikeshare_etl for specific set, cdc, etc.
-
-absolute references
 
 
 

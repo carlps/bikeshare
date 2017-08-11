@@ -12,7 +12,7 @@ from src.utils import get_session
 #   Globals   #
 ###############
 
-DATABASE = 'test.db'
+DATABASE = 'test_bikeshare'
 
 #############
 #   Tests   #

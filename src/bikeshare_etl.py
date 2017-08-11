@@ -259,9 +259,9 @@ def etl(model, session):
 
 
 def main():
-    session = get_session(db='bikeshare.db')
-    etl(Station_Information, session)
+    session = get_session()
     etl(System_Region, session)
+    etl(Station_Information, session)
     session.close()
     # etl('station_status')
 
