@@ -16,22 +16,6 @@ Base = declarative_base()
 
 class Dimension():
 
-    def set_transtype_and_latest(self, transtype, latest):
-        self.transtype = transtype
-        self.latest_row_ind = latest
-
-    def set_tstmps(self):
-        ''' If a new record, set both timestamps to now.
-            If an update, set row_update to now and leave
-            row insert alone.'''
-        if self.row_update_tstmp:
-            # if the tstmp already has value, then we are updating
-            self.row_update_tstmp = datetime.now()
-        else:
-            # if not, then set both to now
-            self.row_insert_tstmp = datetime.now()
-            self.row_update_tstmp = self.row_insert_tstmp
-
     def set_optional(self, attribute_str, record):
         ''' if a attribute is optional, check if the
             key is in the dict. If yes, set.
@@ -41,6 +25,15 @@ class Dimension():
             return record[attribute_str]
         else:
             return None
+
+    def __repr__(self):
+        ''' When session is commited, this no longer works.'''
+        repr_str = f'<{type(self).__name__}(\n'
+        for key in self.__dict__.keys():
+            if key not in ['_sa_instance_state', 'record']:
+                repr_str += f'\t{key}={self.__dict__[key]}\n'
+        repr_str += ')>'
+        return repr_str
 
 
 class Station_Status(Base):
@@ -160,7 +153,7 @@ class Station_Information(Dimension, Base):
                         unique=True,
                         autoincrement=False)
     short_name = Column(Text)
-    name = Column(Text)
+    station_name = Column(Text)
     lat = Column(Numeric)
     lon = Column(Numeric)
     capacity = Column(Integer)
@@ -174,8 +167,7 @@ class Station_Information(Dimension, Base):
     rental_method_transitcard = Column(Boolean)
     rental_method_accountnumber = Column(Boolean)
     rental_method_phone = Column(Boolean)
-    row_insert_tstmp = Column(DateTime)
-    row_update_tstmp = Column(DateTime)
+    row_modified_tstmp = Column(DateTime)
     load_id = Column(Integer, ForeignKey('load_metadata.load_id'))
 
     load = relationship("Load_Metadata", back_populates='stations')
@@ -194,7 +186,7 @@ class Station_Information(Dimension, Base):
             short_name, region_id, capacity, eightd_has_key_dispenser '''
 
         self.station_id = int(record['station_id'])
-        self.name = record['name']
+        self.station_name = record['name']
         self.lat = record['lat']
         self.lon = record['lon']
         self.short_name = self.set_optional('short_name', record)
@@ -203,7 +195,7 @@ class Station_Information(Dimension, Base):
         self.eightd_has_key_dispenser = self.set_optional(
             'eightd_has_key_dispenser', record)
         self.unpack_rental_methods(record)
-        self.set_tstmps()
+        self.row_modified_tstmp = datetime.now()
 
     def unpack_rental_methods(self, record):
         if 'rental_methods' in record.keys():
@@ -235,6 +227,32 @@ class Station_Information(Dimension, Base):
             self.rental_method_accountnumber = None
             self.rental_method_phone = None
 
+    def __eq__(self, other):
+        return self.station_id == other.station_id and\
+            self.short_name == other.short_name and\
+            self.station_name == other.station_name and\
+            self.lat == other.lat and\
+            self.lon == other.lon and\
+            self.capacity == other.capacity and\
+            self.region_id == other.region_id and\
+            self.eightd_has_key_dispenser ==\
+            other.eightd_has_key_dispenser and\
+            self.rental_method_key == other.rental_method_key and\
+            self.rental_method_creditcard ==\
+            other.rental_method_creditcard and\
+            self.rental_method_paypass == other.rental_method_paypass and\
+            self.rental_method_applepay == other.rental_method_applepay and\
+            self.rental_method_androidpay ==\
+            other.rental_method_androidpay and\
+            self.rental_method_transitcard ==\
+            other.rental_method_transitcard and\
+            self.rental_method_accountnumber ==\
+            other.rental_method_accountnumber and\
+            self.rental_method_phone == other.rental_method_phone
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
 
 class System_Region(Dimension, Base):
     ''' represents a System Region (dimension)
@@ -253,8 +271,7 @@ class System_Region(Dimension, Base):
                        autoincrement=False,
                        unique=True)
     region_name = Column(Text)  # how to not null?
-    row_insert_tstmp = Column(DateTime)
-    row_update_tstmp = Column(DateTime)
+    row_modified_tstmp = Column(DateTime)
     load_id = Column(Integer, ForeignKey('load_metadata.load_id'))
 
     stations = relationship("Station_Information",
@@ -270,7 +287,15 @@ class System_Region(Dimension, Base):
             region_id, name '''
         self.region_id = int(record['region_id'])  # convert region_id to int
         self.region_name = record['name']
-        self.set_tstmps()
+        self.row_modified_tstmp = datetime.now()
+
+    def __eq__(self, other):
+        ''' when checking equal, only check id and name '''
+        return self.region_id == other.region_id and\
+            self .region_name == other.region_name
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
 
 class Load_Metadata(Base):
@@ -285,6 +310,7 @@ class Load_Metadata(Base):
     dataset = Column(Text)
     start_tstmp = Column(DateTime)
     end_tstmp = Column(DateTime)
+    src_rows = Column(Integer)
     inserts = Column(Integer)
     updates = Column(Integer)
 
@@ -296,21 +322,31 @@ class Load_Metadata(Base):
                             order_by=Station_Information.station_id,
                             back_populates="load")
 
-    def __init__(self, dataset):
-        ''' a new metadata record should be
+    def __init__(self, dataset, session):
+        ''' A new metadata record should be
             instantiated with the name of the dataset
-            start time will be inserted automatically '''
+            start time will be inserted automatically.
+            Session is used to insert the new record into the
+            DB which will give the load_id. Remember to update
+            the record when load is complete.'''
         self.dataset = dataset
         self.start_tstmp = datetime.now()
         self.end_tstmp = None
+        self.src_rows = None
         self.inserts = None
         self.updates = None
+        # add record to session and commit
+        # this increments id which is needed
+        # during processing
+        session.add(self)
+        session.commit()
 
     def __repr__(self):
         return ('<Load_Metadata(\n'
                 f'load_id={self.load_id}\n'
                 f'dataset={self.dataset}\n'
                 f'start_tstmp={self.start_tstmp}\n'
+                f'src_rows={self.src_rows}'
                 f'end_tstmp={self.end_tstmp}\n'
                 f'inserts={self.inserts}\n'
                 f'updates={self.updates}\n'

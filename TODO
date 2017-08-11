@@ -2,8 +2,10 @@ TODO
 
 
 postgres
-    - load failing?
+    - reconfig etl
+    - reconfig cdc
     - create test db
+        - new tests lol
 
 
 
