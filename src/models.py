@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 
 import sqlalchemy
-from sqlalchemy import Column, Integer, Text, Numeric, DateTime
+from sqlalchemy import Column, Integer, String, Numeric, DateTime
 from sqlalchemy import Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, synonym
@@ -152,8 +152,8 @@ class Station_Information(Dimension, Base):
                         primary_key=True,
                         unique=True,
                         autoincrement=False)
-    short_name = Column(Text)
-    station_name = Column(Text)
+    short_name = Column(String(length=10))
+    station_name = Column(String(length=100), nullable=False)
     lat = Column(Numeric)
     lon = Column(Numeric)
     capacity = Column(Integer)
@@ -169,6 +169,7 @@ class Station_Information(Dimension, Base):
     rental_method_phone = Column(Boolean)
     row_modified_tstmp = Column(DateTime)
     load_id = Column(Integer, ForeignKey('load_metadata.load_id'))
+    transtype = Column(String(length=1))
 
     load = relationship("Load_Metadata", back_populates='stations')
     region = relationship("System_Region", back_populates='stations')
@@ -196,6 +197,7 @@ class Station_Information(Dimension, Base):
             'eightd_has_key_dispenser', record)
         self.unpack_rental_methods(record)
         self.row_modified_tstmp = datetime.now()
+        self.transtype = None
 
     def unpack_rental_methods(self, record):
         if 'rental_methods' in record.keys():
@@ -228,11 +230,13 @@ class Station_Information(Dimension, Base):
             self.rental_method_phone = None
 
     def __eq__(self, other):
+        ''' Only compare non-metadata attributes.
+            Convert lat and lon to floats to ensure correct comparison'''
         return self.station_id == other.station_id and\
             self.short_name == other.short_name and\
             self.station_name == other.station_name and\
-            self.lat == other.lat and\
-            self.lon == other.lon and\
+            float(self.lat) == float(other.lat) and\
+            float(self.lon) == float(other.lon) and\
             self.capacity == other.capacity and\
             self.region_id == other.region_id and\
             self.eightd_has_key_dispenser ==\
@@ -270,9 +274,10 @@ class System_Region(Dimension, Base):
                        primary_key=True,
                        autoincrement=False,
                        unique=True)
-    region_name = Column(Text)  # how to not null?
+    region_name = Column(String(length=50), nullable=False)
     row_modified_tstmp = Column(DateTime)
     load_id = Column(Integer, ForeignKey('load_metadata.load_id'))
+    transtype = Column(String(length=1))
 
     stations = relationship("Station_Information",
                             order_by=Station_Information.station_id,
@@ -288,6 +293,7 @@ class System_Region(Dimension, Base):
         self.region_id = int(record['region_id'])  # convert region_id to int
         self.region_name = record['name']
         self.row_modified_tstmp = datetime.now()
+        self.transtype = None
 
     def __eq__(self, other):
         ''' when checking equal, only check id and name '''
@@ -307,7 +313,7 @@ class Load_Metadata(Base):
     __tablename__ = 'load_metadata'
 
     load_id = Column(Integer, primary_key=True, unique=True)
-    dataset = Column(Text)
+    dataset = Column(String(length=20))
     start_tstmp = Column(DateTime)
     end_tstmp = Column(DateTime)
     src_rows = Column(Integer)
@@ -336,8 +342,7 @@ class Load_Metadata(Base):
         self.inserts = None
         self.updates = None
         # add record to session and commit
-        # this increments id which is needed
-        # during processing
+        # this increments id which is needed during processing
         session.add(self)
         session.commit()
 

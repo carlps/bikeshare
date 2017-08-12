@@ -81,18 +81,24 @@ def compare_data(data, model, metadata, session):
         If db data doesn't exist in new data: insert.
         If db data exists and matches: do nothing
         If nothing in db data: insert all '''
-
+    upd_count = 0
     # get all db objects with same id as new data
     for match in session.query(model).filter(model.id.in_(data.keys())).all():
-        # use merge to update for updates
-        session.merge(data.pop(match.id))
-        # so now, session.dirty is the updated records
-        # and anything left in data is a new record
+        # if values in the row don't match, merge with new record
+        # != operator overridden to compare only certain attributes
+        if match != data[match.id]:
+            data[match.id].transtype = 'U'
+            session.merge(data.pop(match.id))
+            upd_count += 1
+        # if they do match, simply delete from data, since no change
+        else:
+            del(data[match.id])
+    # everything in data at this point is new inserts only
     for insert in data:
+        data[insert].transtype = 'I'
         session.add(data[insert])
-
     # update metadata
-    metadata.updates = len(session.dirty)
+    metadata.updates = upd_count
     metadata.inserts = len(session.new)
     metadata.end_tstmp = datetime.now()
     session.add(metadata)
@@ -115,7 +121,7 @@ def etl(model, session):
 def main():
     session = get_session()
     etl(System_Region, session)
-    # etl(Station_Information, session)
+    etl(Station_Information, session)
     session.close()
 
 
