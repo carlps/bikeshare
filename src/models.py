@@ -9,6 +9,7 @@ from sqlalchemy import Column, Integer, String, Numeric, DateTime
 from sqlalchemy import Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, synonym
+from sqlalchemy.sql.functions import current_user
 
 
 Base = declarative_base()
@@ -170,6 +171,7 @@ class Station_Information(Dimension, Base):
     row_modified_tstmp = Column(DateTime)
     load_id = Column(Integer, ForeignKey('load_metadata.load_id'))
     transtype = Column(String(length=1))
+    modified_by = Column(String(length=50), default=current_user())
 
     load = relationship("Load_Metadata", back_populates='stations')
     region = relationship("System_Region", back_populates='stations')
@@ -278,10 +280,12 @@ class System_Region(Dimension, Base):
     row_modified_tstmp = Column(DateTime)
     load_id = Column(Integer, ForeignKey('load_metadata.load_id'))
     transtype = Column(String(length=1))
+    modified_by = Column(String(length=50), default=current_user())
 
     stations = relationship("Station_Information",
                             order_by=Station_Information.station_id,
                             back_populates='region')
+
     load = relationship("Load_Metadata", back_populates='regions')
 
     # create sqlalchemy synonyms to lookup easier
@@ -303,6 +307,18 @@ class System_Region(Dimension, Base):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def to_tuple(self):
+        ''' Returns tuple with the following:
+            region_id, region_name, row_modified_tstmp,
+            load_id, transtype, modified_by.
+            Mostly just used for testing.'''
+        return (self.region_id,
+                self.region_name,
+                self.row_modified_tstmp,
+                self.load_id,
+                self.transtype,
+                self.modified_by)
+
 
 class Load_Metadata(Base):
     ''' Control table used to capture metadata of a load.
@@ -319,6 +335,7 @@ class Load_Metadata(Base):
     src_rows = Column(Integer)
     inserts = Column(Integer)
     updates = Column(Integer)
+    modified_by = Column(String(length=50), default=current_user())
 
     regions = relationship("System_Region",
                            order_by=System_Region.region_id,

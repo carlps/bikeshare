@@ -119,7 +119,7 @@ def etl(model, session):
 
 
 def main():
-    session = get_session()
+    session = get_session(env="DEV")
     etl(System_Region, session)
     etl(Station_Information, session)
     session.close()
