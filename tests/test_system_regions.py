@@ -8,7 +8,7 @@ from os import environ
 from sqlalchemy import delete
 import psycopg2
 
-from src.bikeshare_etl import get_data, compare_data
+from src.bikeshare_etl import get_data, compare_data, etl
 from src.models import Load_Metadata, System_Region
 from src.utils import get_session
 
@@ -60,10 +60,14 @@ def create_metadata(model):
     return Load_Metadata(model.__tablename__, SESSION)
 
 
-def get_cursor():
+def get_connection_and_cursor(user='tst', pw=''):
     ''' use psycopgs2 to connect to test db'''
-    u = environ['POSTGRES_USER_TST']
-    pw = environ['POSTGRES_PW_TST']
+    if user == 'tst':
+        u = environ['POSTGRES_USER_TST']
+        pw = environ['POSTGRES_PW_TST']
+    else:
+        u = user
+        pw = pw
     host = 'localhost'
     port = '5432'
     db = 'bikeshare_tst'
@@ -72,7 +76,7 @@ def get_cursor():
                                   password=pw,
                                   host=host,
                                   port=port)
-    return connection.cursor()
+    return connection, connection.cursor()
 
 
 #############
@@ -105,7 +109,7 @@ class SystemRegionTestCase(unittest.TestCase):
         compare_data(data, System_Region, metadata, SESSION)
         SESSION.commit()
         # get data from db
-        cur = get_cursor()
+        conn, cur = get_connection_and_cursor()
         cur.execute('''SELECT region_id,
                        region_name,
                        row_modified_tstmp,
@@ -129,22 +133,27 @@ class SystemRegionTestCase(unittest.TestCase):
 
     def test_update_only_updates_that_record(self):
         ''' load, then load an update. ensure only that record was updated'''
+        # first get data and load
         metadata = create_metadata(System_Region)
         data = get_data(System_Region, metadata)
         compare_data(data, System_Region, metadata, SESSION)
         SESSION.commit()
+        # get tuple copies of each record that was loaded
         originals = {}
         for row in data:
             originals[row] = data[row].to_tuple()
+        # now get data again
         m2 = create_metadata(System_Region)
         d2 = get_data(System_Region, m2)
+        # get one record from data and make a change
         u_record = d2[list(d2.keys())[0]]
         u_record.region_name = 'phoney balogna'
-        print(u_record)
         u_data = {u_record.id: u_record}
+        # load new record (should be update)
         compare_data(u_data, System_Region, metadata, SESSION)
         SESSION.commit()
-        cur = get_cursor()
+        # get all current data from db
+        conn, cur = get_connection_and_cursor()
         cur.execute('''SELECT region_id,
                        region_name,
                        row_modified_tstmp,
@@ -156,23 +165,26 @@ class SystemRegionTestCase(unittest.TestCase):
         row_updated = True
         rows_match = True
         correct_trans = True
+        # iterate through db data. break if any test fails
         i = 0
         while i < len(db_data) and\
                 row_updated and\
                 rows_match and\
                 correct_trans:
             row = db_data[i]
+            orig = originals[row[0]]
             if row[0] == u_record.id:
-                orig = u_record.to_tuple()
                 trans = 'U'
-                row_updated = orig != row
+                # update orig should not match row and ensure name was updated
+                row_updated = (orig != row) and (row[1] == 'phoney balogna')
             else:
-                orig = originals[row[0]]
+                # all other records row should match orig
                 trans = 'I'
                 rows_match = (orig == row)
             correct_trans = (row[4] == trans)
             if not row_updated:
                 print(f'row {row} shouldnt match orig {orig}')
+                print('also, region_name in row should be phoney balogna')
             if not rows_match:
                 print(f'row {row} didnt match orig {orig}')
             if not correct_trans:
@@ -181,6 +193,56 @@ class SystemRegionTestCase(unittest.TestCase):
         self.assertTrue(row_updated and rows_match and correct_trans)
         empty_db()
 
+    def test_system_region_eq(self):
+        ''' == operator on System Region should
+            only compare region_name and region_id'''
+        # create two identical records
+        r1 = create_dummy_region()
+        r2 = create_dummy_region()
+        # change metadata that shouldn't be compared
+        r1.load_id = 612
+        r2.load_id = 9
+        r1.transtype = 'P'
+        r2.transtype = 'Q'
+        self.assertEqual(r1, r2)
+
+    def test_system_region_eq2(self):
+        ''' Ensure == returns false when name and or id are different'''
+        r1 = create_dummy_region(name='r1')
+        r2 = create_dummy_region(name='r2')
+        self.assertNotEqual(r1, r2)
+
+    def test_update_captures_username(self):
+        ''' When a db record is updated,
+            modified_by should be changed to show who it was'''
+        # run a load (as bikeshare_tst)
+        etl(System_Region, SESSION)
+        conn, cur = get_connection_and_cursor()
+        cur.execute('SELECT region_id FROM system_regions;')
+        row_id = cur.fetchone()
+        # connect as different user
+        conn, cur = get_connection_and_cursor(user='test_user',
+                                              pw=environ['POSTGRES_PW_TST'])
+        cur.execute('''UPDATE system_regions
+                       SET region_name = 'Beernalillo, NM'
+                       WHERE region_id = (%s);''', row_id)
+        conn.commit()
+        cur.execute('SELECT region_id, modified_by FROM system_regions')
+        db_data = cur.fetchall()
+        correct = True
+        i = 0
+        while i < len(db_data) and correct:
+            row = db_data[i]
+            if row[0] == row_id[0]:
+                user = 'test_user'
+            else:
+                user = environ['POSTGRES_USER_TST']
+            correct = (row[1] == user)
+            if not correct:
+                print(f'user should be {user} but is actually {row[1]}')
+            i += 1
+        self.assertTrue(correct)
+        empty_db()
 
 if __name__ == '__main__':
     unittest.main()
