@@ -231,6 +231,26 @@ class Station_Information(Dimension, Base):
             self.rental_method_accountnumber = None
             self.rental_method_phone = None
 
+    def to_tuple(self):
+        ''' Returns station as a tuple with the following order:
+            station_id, short_name, station_name, lat, lon,
+            capacity, region_id, eightd_has_key_dispenser,
+            rental_method_key, rental_method_creditcard,
+            rental_method_paypass, rental_method_applepay,
+            rental_method_androidpay, rental_method_transitcard,
+            rental_method_accountnumber, rental_method_phone,
+            row_modified_tstmp, load_id, transtype, modified_by.
+            Mostly just used for testing. '''
+        return (self.station_id, self.short_name, self.station_name,
+                self.lat, self.lon, self.capacity, self.region_id,
+                self.eightd_has_key_dispenser, self.rental_method_key,
+                self.rental_method_creditcard, self.rental_method_paypass,
+                self.rental_method_applepay, self.rental_method_androidpay,
+                self.rental_method_transitcard,
+                self.rental_method_accountnumber, self.rental_method_phone,
+                self.row_modified_tstmp, self.load_id, self.transtype,
+                self.modified_by)
+
     def __eq__(self, other):
         ''' Only compare non-metadata attributes.
             Convert lat and lon to floats to ensure correct comparison'''
