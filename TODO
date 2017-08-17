@@ -2,10 +2,11 @@ TODO
 
 
 postgres
-    - reconfig etl
-    - reconfig cdc
-    - create test db
-        - new tests lol
+    x- reconfig etl
+    -- reconfig cdc
+        -- new testsz
+    x- create test db
+        x- new tests lol
 
 
 
@@ -13,30 +14,10 @@ postgres
 
 
 tests:
--insert on empty db
--compare IUD
 -empty file
--views are correct
--all deletes?
--can get data and create obj
 
 *args, **kwargs?
-
-What happens when I, D, and then new? Probably a new I, right?
-
 
 
 station status might be better for mongodb?
 
-
-
-make a utils lib with things like:
-    def backup_file(file):
-        '''
-        makes a copy of file with .bkp appended to filename in current working dir
-        '''
-        fname = os.path.join(os.getcwd(),file)
-        fname_bkp = f'{fname}.bkp'
-        return shutil.copyfile(fname,fname_bkp)
-
-    get_data(dataset) returning json for dataset could be good

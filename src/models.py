@@ -48,10 +48,9 @@ class Station_Status(Base):
 
     __tablename__ = 'station_status'
 
-    last_updated = Column(DateTime, primary_key=True)
-    station_id = Column(Integer,
-                        ForeignKey('station_information.station_id'),
-                        primary_key=True)
+    status_id = Column(Integer, primary_key=True)
+    last_updated = Column(DateTime)
+    station_id = Column(Integer, ForeignKey('station_information.station_id'))
     num_bikes_available = Column(Integer)
     num_bikes_disabled = Column(Integer)
     num_docks_available = Column(Integer)
@@ -65,7 +64,8 @@ class Station_Status(Base):
                                        back_populates='station_statuses')
 
     # set unique constraint for primary key cols
-    UniqueConstraint(last_updated, station_id, name="station_status_pk_unique")
+    UniqueConstraint(last_updated, station_id,
+                     name="station_status_lu_id_unique")
 
     def __init__(self, record):
         ''' record should be a dict with the following keys:
@@ -80,7 +80,6 @@ class Station_Status(Base):
             this one is different than others since it doesn't calc md5
 
             any fields that aren't require use set_[] to prevent KeyError '''
-        self.record = record
 
         self.last_updated = record['last_updated']
         self.station_id = int(record['station_id'])
@@ -91,18 +90,18 @@ class Station_Status(Base):
         self.is_returning = bool(record['is_returning'])
         self.last_reported = record['last_reported']
         # optionals
-        self.set_num_bikes_disabled()
-        self.set_num_docks_disabled()
+        self.set_num_bikes_disabled(record)
+        self.set_num_docks_disabled(record)
 
-    def set_num_bikes_disabled(self):
+    def set_num_bikes_disabled(self, record):
         try:
-            self.num_bikes_disabled = self.record['num_bikes_disabled']
+            self.num_bikes_disabled = record['num_bikes_disabled']
         except KeyError:
             self.num_bikes_disabled = None
 
-    def set_num_docks_disabled(self):
+    def set_num_docks_disabled(self, record):
         try:
-            self.num_docks_disabled = self.record['num_docks_disabled']
+            self.num_docks_disabled = record['num_docks_disabled']
         except KeyError:
             self.num_docks_disabled = None
 
