@@ -3,13 +3,15 @@ TODO
 
 postgres
     x- reconfig etl
-    -- reconfig cdc
-        -- new testsz
+    x- reconfig cdc
+        -- see if code can be cleant
+        -- check on tstmps
+        -- new tests
     x- create test db
         x- new tests lol
 
 
-
+move get_data to utils?
 
 
 
