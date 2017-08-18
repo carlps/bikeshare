@@ -59,6 +59,7 @@ class Station_Status(Base):
     is_renting = Column(Boolean)
     is_returning = Column(Boolean)
     last_reported = Column(DateTime)
+    modified_by = Column(String(length=50), default=current_user())
 
     station_information = relationship("Station_Information",
                                        back_populates='station_statuses')
@@ -81,14 +82,14 @@ class Station_Status(Base):
 
             any fields that aren't require use set_[] to prevent KeyError '''
 
-        self.last_updated = record['last_updated']
+        self.last_updated = datetime.fromtimestamp(record['last_updated'])
         self.station_id = int(record['station_id'])
         self.num_bikes_available = record['num_bikes_available']
         self.num_docks_available = record['num_docks_available']
         self.is_installed = bool(record['is_installed'])
         self.is_renting = bool(record['is_renting'])
         self.is_returning = bool(record['is_returning'])
-        self.last_reported = record['last_reported']
+        self.last_reported = datetime.fromtimestamp(record['last_reported'])
         # optionals
         self.set_num_bikes_disabled(record)
         self.set_num_docks_disabled(record)
@@ -377,10 +378,10 @@ class Load_Metadata(Base):
         self.src_rows = None
         self.inserts = None
         self.updates = None
-        # add record to session and commit
+        # add record to session and flush
         # this increments id which is needed during processing
         session.add(self)
-        session.commit()
+        session.flush()
 
     def __repr__(self):
         return ('<Load_Metadata(\n'
