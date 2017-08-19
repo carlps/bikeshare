@@ -4,7 +4,7 @@ This repository currently contains the source for an ETL/CDC pipeline for Capita
 More information about the General Bikeshare Feed Specification can be fund [here](https://github.com/NABSA/gbfs/blob/master/gbfs.md). More information about the Capital Bikeshare system can be found [here](https://www.capitalbikeshare.com/). 
 
 ## Table of Contents
-- [The Database](#thedatabase)
+- [The Database](#the-database)
 - [Processing](#processing)
 - [Mysteries](#mysteries)
 - [Copyright and License](#copyright-and-license)
