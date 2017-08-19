@@ -10,55 +10,46 @@ from src.bikeshare_etl import get_data, compare_data, etl
 from src.models import Load_Metadata, System_Region, Station_Information
 from src.utils import get_session
 
-###############
-#   Globals   #
-###############
-
-SESSION = get_session(env='TST', echo=True)
-
 
 ##########################
 #   Setup and Teardown   #
 ##########################
 
 def setUp():
-    empty_db()
-    load_regions()
+    session = get_session(env='TST', echo=True)
+    empty_db(session)
+    load_regions(session)
     # load one dummy region with region_id 9999
-    load_single_region(create_dummy_region())
+    load_single_region(create_dummy_region(), session)
+    session.close()
 
 
 def tearDown():
-    empty_db()
-    SESSION.close()
+    session = get_session(env='TST', echo=True)
+    empty_db(session)
+    session.close()
 
 
 ########################
 #   Helper Functions   #
 ########################
 
-def load_regions():
+def load_regions(session):
     ''' must have regions in db because FK '''
-    etl(System_Region, SESSION)
+    etl(System_Region, session)
 
 
-def load_db_dummy_data(dummy):
-    # insert test data into db
-    SESSION.add(dummy)
-    SESSION.commit()
-
-
-def empty_db():
+def empty_db(session):
     # empty test db
-    SESSION.query(Station_Information).delete()
-    SESSION.query(System_Region).delete()
-    SESSION.query(Load_Metadata).delete()
-    SESSION.commit()
+    session.query(Station_Information).delete()
+    session.query(System_Region).delete()
+    session.query(Load_Metadata).delete()
+    session.commit()
 
 
-def empty_table_station_information():
-    SESSION.query(Station_Information).delete()
-    SESSION.commit()
+def empty_table_station_information(session):
+    session.query(Station_Information).delete()
+    session.commit()
 
 
 def create_dummy_region(name='test_region'):
@@ -68,11 +59,11 @@ def create_dummy_region(name='test_region'):
     return sr
 
 
-def load_single_region(region):
-    metadata = Load_Metadata(System_Region.__tablename__, SESSION)
+def load_single_region(region, session):
+    metadata = Load_Metadata(System_Region.__tablename__, session)
     region.load_id = metadata.load_id
-    SESSION.add(metadata, region)
-    SESSION.commit()
+    session.add(metadata, region)
+    session.commit()
 
 
 def create_dummy_station(name='test_station'):
@@ -85,8 +76,8 @@ def create_dummy_station(name='test_station'):
     return si
 
 
-def create_metadata(model):
-    return Load_Metadata(model.__tablename__, SESSION)
+def create_metadata(model, session):
+    return Load_Metadata(model.__tablename__, session)
 
 
 def get_connection_and_cursor(user='tst', pw=''):
@@ -117,26 +108,31 @@ class StationInformationTestCase(unittest.TestCase):
 
     def test_get_data_returns_dict(self):
         ''' ensure we get a dict of Station_Information back '''
-        metadata = create_metadata(Station_Information)
+        session = get_session(env='TST', echo=True)
+        metadata = create_metadata(Station_Information, session)
         data = get_data(Station_Information, metadata)
         self.assertIsInstance(data, dict)
+        session.close()
 
     def test_get_data_dict_key_is_id(self):
         ''' ensure dict key is row.id'''
-        metadata = create_metadata(Station_Information)
+        session = get_session(env='TST', echo=True)
+        metadata = create_metadata(Station_Information, session)
         data = get_data(Station_Information, metadata)
         correct = True
         for row in data:
             if row != data[row].id:
                 correct = False
         self.assertTrue(correct)
+        session.close()
 
     def test_load_on_empty(self):
         ''' all records pulled down should be loaded into db '''
-        metadata = create_metadata(Station_Information)
+        session = get_session(env='TST', echo=True)
+        metadata = create_metadata(Station_Information, session)
         data = get_data(Station_Information, metadata)
-        compare_data(data, Station_Information, metadata, SESSION)
-        SESSION.commit()
+        compare_data(data, Station_Information, metadata, session)
+        session.commit()
         # get data from db
         conn, cur = get_connection_and_cursor()
         cur.execute('''SELECT station_id,
@@ -172,29 +168,31 @@ class StationInformationTestCase(unittest.TestCase):
                 print(f'row {row} didnt match orig {orig}')
             i += 1
         self.assertTrue(correct)
-        empty_table_station_information()
+        empty_table_station_information(session)
+        session.close()
 
     def test_update_only_updates_that_record(self):
         ''' load, then load an update. ensure only that record was updated'''
         # first get data and load
-        metadata = create_metadata(Station_Information)
+        session = get_session(env='TST', echo=True)
+        metadata = create_metadata(Station_Information, session)
         data = get_data(Station_Information, metadata)
-        compare_data(data, Station_Information, metadata, SESSION)
-        SESSION.commit()
+        compare_data(data, Station_Information, metadata, session)
+        session.commit()
         # get tuple copies of each record that was loaded
         originals = {}
         for row in data:
             originals[row] = data[row].to_tuple()
         # now get data again
-        m2 = create_metadata(Station_Information)
+        m2 = create_metadata(Station_Information, session)
         d2 = get_data(Station_Information, m2)
         # get one record from data and make a change
         u_record = d2[list(d2.keys())[0]]
         u_record.station_name = 'phoney balogna'
         u_data = {u_record.id: u_record}
         # load new record (should be update)
-        compare_data(u_data, Station_Information, metadata, SESSION)
-        SESSION.commit()
+        compare_data(u_data, Station_Information, metadata, session)
+        session.commit()
         # get all current data from db
         conn, cur = get_connection_and_cursor()
         cur.execute('''SELECT station_id,
@@ -248,7 +246,8 @@ class StationInformationTestCase(unittest.TestCase):
                 print(f'incorrect trans on row {row} -- should be {trans}')
             i += 1
         self.assertTrue(row_updated and rows_match and correct_trans)
-        empty_table_station_information()
+        empty_table_station_information(session)
+        session.close()
 
     def test_system_region_eq(self):
         ''' == operator on System Region should
@@ -273,7 +272,8 @@ class StationInformationTestCase(unittest.TestCase):
         ''' When a db record is updated,
             modified_by should be changed to show who it was'''
         # run a load (as bikeshare_tst)
-        etl(Station_Information, SESSION)
+        session = get_session(env='TST', echo=True)
+        etl(Station_Information, session)
         conn, cur = get_connection_and_cursor()
         cur.execute('SELECT station_id FROM station_information;')
         row_id = cur.fetchone()
@@ -299,7 +299,8 @@ class StationInformationTestCase(unittest.TestCase):
                 print(f'user should be {user} but is actually {row[1]}')
             i += 1
         self.assertTrue(correct)
-        empty_table_station_information()
+        empty_table_station_information(session)
+        session.close()
 
 if __name__ == '__main__':
     unittest.main()
