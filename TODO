@@ -10,6 +10,7 @@ postgres
     x- create test db
         x- new tests lol
 
+check session in etl tests
 
 move get_data to utils?
 
