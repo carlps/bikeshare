@@ -106,6 +106,19 @@ class Station_Status(Base):
         except KeyError:
             self.num_docks_disabled = None
 
+    def to_tuple(self):
+        ''' Returns rows in following order:
+            status_id, last_updated, station_id, num_bikes_available,
+            num_bikes_disabled, num_docks_available, num_docks_disabled,
+            is_installed, is_renting, is_returning, last_reported, modified_by
+            Mostly just used for testing.
+        '''
+        return (self.status_id, self.last_updated, self.station_id,
+                self.num_bikes_available, self.num_bikes_disabled,
+                self.num_docks_available, self.num_docks_disabled,
+                self.is_installed, self.is_renting, self.is_returning,
+                self.last_reported, self.modified_by)
+
     def __repr__(self):
         return ('<Station_Status(\n'
                 f'\tlast_updated={self.last_updated},\n'
