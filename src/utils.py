@@ -1,24 +1,29 @@
 # Common utils used in different scripts
-import os
+from os import environ
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 
-def get_session(db, echo=False):
-    ''' create db connection and sqlalchemy engine
-    return a session to interact with db
-    currently sqlite but not for long
+def get_session(env='DEV', echo=False):
+    ''' Create db connection and sqlalchemy engine
+        Return a session to interact with db
 
-    echo defaults to False, but if you want for debugging,
-    just pass echo=True and sql statements will print to console
-    '''
-    # grab the folder where this script lives
-    basedir = os.path.abspath(os.path.dirname(__file__))
-    DATABASE = db
-    # define the full path for the database
-    DATABASE_PATH = os.path.join(basedir, DATABASE)
-    engine = create_engine(f'sqlite:///{DATABASE_PATH}', echo=echo)
+        Echo defaults to False, but if you want for debugging,
+        just pass echo=True and sql statements will print to console'''
+    if env == 'DEV':
+        pg_user = environ['POSTGRES_USER']
+        pg_pw = environ['POSTGRES_PW']
+        db = 'bikeshare'
+    elif env == 'TST':
+        pg_user = environ['POSTGRES_USER_TST']
+        pg_pw = environ['POSTGRES_PW_TST']
+        db = 'bikeshare_tst'
+
+    host = 'localhost'
+    port = '5432'
+    engine = create_engine(f'postgres://{pg_user}:{pg_pw}@{host}:{port}/{db}',
+                            echo=echo)
     Session = sessionmaker(bind=engine)
 
     return Session()

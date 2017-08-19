@@ -1,58 +1,26 @@
 TODO
 
-sqlalchemy
-    --convert to datetimes to datetime
-    --bikeshare_etl:
-        x-compare
-        x-update_old
-        x-load
-        x-metadata
-    x-cdc
-        --TEST!
 
+postgres
+    x- reconfig etl
+    x- reconfig cdc
+        -- see if code can be cleant
+        -- check on tstmps
+        -- new tests
+    x- create test db
+        x- new tests lol
 
-! unit tests
-    x-make an empty copy of db for testing
-    x-system regions
-        x-metadata
-    x-station information
-        x-metadata
-    --cdc
+check session in etl tests
 
-! pep8/lint
+move get_data to utils?
 
 
 
 tests:
--insert on empty db
--compare IUD
 -empty file
--views are correct
--all deletes?
--can get data and create obj
 
 *args, **kwargs?
-
-What happens when I, D, and then new? Probably a new I, right?
-
-
-run.py file which runs bikeshare_etl for specific set, cdc, etc.
-
-absolute references
-
 
 
 station status might be better for mongodb?
 
-
-
-make a utils lib with things like:
-    def backup_file(file):
-        '''
-        makes a copy of file with .bkp appended to filename in current working dir
-        '''
-        fname = os.path.join(os.getcwd(),file)
-        fname_bkp = f'{fname}.bkp'
-        return shutil.copyfile(fname,fname_bkp)
-
-    get_data(dataset) returning json for dataset could be good

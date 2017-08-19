@@ -13,8 +13,9 @@ SQLAlchemy is used as an ORM
 '''
 
 import requests
-import time
 import os
+import logging
+from datetime import datetime
 
 from sqlalchemy.orm import make_transient
 
@@ -24,246 +25,104 @@ from .utils import get_session
 
 
 def get_data(model, metadata):
-    '''
-    uses requests to lookup bikeshare data
-    model should be one of the main data models in models.py
+    ''' Lookup bikeshare data and return dict of objects like {id:obj}.
+        Model should be one of the main data models in models.py
+            ie System_Region or Station_Status
+        Metadata should be an instance of a Load_Metadata object
+        which will be updated with amount of source rows.
+        Whatever model is passed is the type of objects returned. '''
 
-    metadata is a database record with metadata for the load
-
-    returns list of objects (each of type model)
-    '''
-
+    results = {}
     table_name = model.__tablename__
 
-    # first, validate proper param
-    valid_files = ('station_information', 'station_status', 'system_regions')
-    if table_name not in valid_files:
-        print("invalid table_name. should be one of:", valid_files)
-        return
+    # model should only be subclasses of Dimension
+    if not issubclass(model, Dimension):
+        raise TypeError('model should be child of Dimension')
 
     # build url using param
-    url = 'https://gbfs.capitalbikeshare.com/gbfs/en/{}.json'.format(
-        table_name)
+    url = f'https://gbfs.capitalbikeshare.com/gbfs/en/{table_name}.json'
 
     # attempt to get url
     response = requests.get(url)
-
-    # if not 200, print repsonse and return
-    if response.status_code != 200:
-        print('invalid response:', response.status_code)
-        return
-
+    # if response is not good, raise error
+    response.raise_for_status()
     # retrieve json and break into pieces needed
     response_json = response.json()
-    last_updated = response_json['last_updated']  # unix timestamp
 
-    # data is a dict with one object: a list of dicts
-    # so break out that list to return
+    # ensure data is as expected
     if len(response_json['data']) != 1:
-        print('data dict not 1')
-        # TODO: HANDLE BETTER. should write to log
-        return
-    # different files have different key for the one list, so use values()
-    # and convert to list
+        logging.basicConfig(filename='.logs/etl.get_data.log',
+                            format='%(asctime)s %(message)s',
+                            level=logging.DEBUG)
+        logging.debug(f"Response data from {url}" +
+                       "came back in an unexpected format.")
+        logging.debug(f'json: {response_json}')
+        logging.debug("Expected response['data'] to be a " +
+                      "dictionary with one entry.")
+        raise ValueError('API response came back in unexpected format')
+
+    # get first (and only) value from data, which is list of dicts
     data = list(response_json['data'].values())[0]
-
-    # add last_updated to each row in data, then convert each dict to the
-    # defined object.
+    # create an object for each row pulled down
     for row in data:
-        row['last_updated'] = last_updated
-        data[data.index(row)] = model(row)
-
-    print(f'{model.__name__}: extract done. {len(data)} rows of data')
-
-    # update metadata with last_updated
-    metadata.last_updated_tstmp = last_updated
-
-    # return list of objects
-    return data
+        row = model(row)
+        row.load_id = metadata.load_id
+        results[row.id] = row
+    # update metadata
+    metadata.src_rows = len(results)
+    print(f'{model.__name__}: extract done. {len(results)} rows of data')
+    # return dictionary
+    return results
 
 
 def compare_data(data, model, metadata, session):
-    '''
-    lookup the data in sql
-    if db data exists in new data but doesn't match: update
-    if db data doesn't exist in new data: insert
-    if db data exists but not in new data: delete
-    if db data exists and matches: do nothing
-
-    if nothing in db data: insert all
-    '''
-
-    # get a list of row_ids to be used in comparison
-    row_ids = [row.id for row in data]
-
-    # get all ids and md5s with matching ids
-    # filter for latest, non-deleted rows
-    # store in dict with row_id as key and md5 as val
-    matches = {}
-    for id, md5 in session.query(model.id, model.md5).\
-            filter(model.id.in_(row_ids)).\
-            filter(model.latest_row_ind == 'Y').\
-            filter(model.transtype != 'D').\
-            all():
-        matches[id] = md5
-
-    # we want whole records for deletes so we can insert D
-    # filter for region_id not in (note ~ in row_id.in_)
-    deletes = session.query(model).\
-        filter(~model.id.in_(row_ids)).\
-        filter(model.latest_row_ind == 'Y').\
-        filter(model.transtype != 'D').\
-        all()
-
-    # quick check - if no matches or deletes,
-    # set all records to inserts and return
-    if len(matches) == 0 and len(deletes) == 0:
-        for row in data:
-            row.set_transtype_and_latest('I', 'Y')
-        metadata.inserts = len(data)
-        metadata.updates = 0
-        metadata.deletes = 0
-        print(f'{model.__name__}: all new records. {len(data)} inserts')
-        return {'inserts': data,
-                'updates': [],
-                'updates_old': [],
-                'deletes': []}
-
-    for row in deletes:
-        # in order to prevent update when we want to insert a copy,
-        # we have to expunge and make_transient delete rows
-        session.expunge(row)
-        make_transient(row)
-        # then update transtype and latest_row_ind (see parent class Dimension)
-        row.set_transtype_and_latest('D', 'Y')
-
-    # pull last_updated from a row to use for deletes
-    last_updated = data[0].last_updated
-    for deleted_row in deletes:
-        deleted_row.last_updated = last_updated
-
-    # if id is not in matches, then it is a brand new record
-
-    inserts = []
-    for row in data:
-        if row.id not in matches:
-            # mark it as insert and latest
-            row.set_transtype_and_latest('I', 'Y')
-            inserts.append(row)
-    # remove inserts from data list
-    for i in inserts:
-        del(data[data.index(i)])
-
-    # empty lists to fill in for updates
-    updates = []
-    updates_old = []
-
-    # handle updates IF we have any matches
-    if len(matches) > 0:
-        for row in data:
-            # if md5s don't match, then the record has been updated
-            if row.md5 != matches[row.id]:
-                # tuple (id,md5) to update the old record to latest_row_ind=N
-                updates_old.append((row.id, matches[row.id]))
-
-                # whole new row to insert as latest, updated record
-                row.set_transtype_and_latest('U', 'Y')
-                updates.append(row)
-
+    ''' Compare data from API to current data in DB.
+        If db data exists in new data but doesn't match: update.
+        If db data doesn't exist in new data: insert.
+        If db data exists and matches: do nothing
+        If nothing in db data: insert all '''
+    upd_count = 0
+    # get all db objects with same id as new data
+    for match in session.query(model).filter(model.id.in_(data.keys())).all():
+        # if values in the row don't match, merge with new record
+        # != operator overridden to compare only certain attributes
+        if match != data[match.id]:
+            data[match.id].transtype = 'U'
+            session.merge(data.pop(match.id))
+            upd_count += 1
+        # if they do match, simply delete from data, since no change
+        else:
+            del(data[match.id])
+    # everything in data at this point is new inserts only
+    for insert in data:
+        data[insert].transtype = 'I'
+        session.add(data[insert])
     # update metadata
-    metadata.inserts = len(inserts)
-    metadata.updates = len(updates)
-    metadata.deletes = len(deletes)
-
-    print(f'{model.__name__}: compared data. {len(inserts)} inserts. ',
-          f'{len(updates)} updates. {len(deletes)} deletes.')
-
-    return({'inserts': inserts,
-            'updates': updates,
-            'updates_old': updates_old,
-            'deletes': deletes})
-
-
-def update_old(data, model, session):
-    '''
-    before inserting records that are U or D
-    update the old version to set latest_row_ind = 'N'
-    '''
-
-    # if no deletes or updates, nothing to do here
-    if len(data['deletes'] + data['updates_old']) == 0:
-        print('no updates or deletes')
-        return
-
-    # get md5s from deletes and updates_old to update
-    md5s = [rec.md5 for rec in data['deletes']]
-    # these are tuples with (id,md5)
-    md5s += [rec[-1] for rec in data['updates_old']]
-
-    # use md5 to update old records
-    session.query(model).\
-        filter(model.md5.in_(md5s)).\
-        update({model.latest_row_ind: 'N'}, synchronize_session='fetch')
-    session.commit()
-
-    print(f'{model.__name__}: updated {len(md5s)} old records.')
-
-
-def load_data(data, model, metadata, session):
-    '''
-    load data into db
-    data should be dict of lists of objects
-
-    dict keys must be 'inserts', 'updates', and 'deletes'
-    '''
-
-    # combine all records into one batch
-    batch = data['inserts'] + data['updates'] + data['deletes']
-
-    # insert batch into db
-    session.add_all(batch)
-    metadata.end_time = time.time()
+    metadata.updates = upd_count
+    metadata.inserts = len(session.new)
+    metadata.end_tstmp = datetime.now()
     session.add(metadata)
-    session.commit()
-
-    print(f'{model.__name__}: load done. loaded {len(batch)} records.'
-          f'\nsee table load_metadata, '
-          f'last_updated {metadata.last_updated_tstmp} for details')
+    print(f'{model.__name__}: compared data.',
+          f'{metadata.inserts} inserts. ',
+          f'{metadata.updates} updates.')
 
 
 def etl(model, session):
-    '''
-    get data, transform, update old if needed, insert new
-    '''
-
-    table_name = model.__tablename__
-
-    # instantiate metadata object
-    metadata = Load_Metadata(table_name)
-
-    # get data from API
+    ''' Get data, transform, update old if needed, insert new'''
+    metadata = Load_Metadata(model.__tablename__, session)
     data = get_data(model, metadata)
-
-    # for dimensions, we have to compare and update old
-    if issubclass(model, Dimension):
-        data = compare_data(data, model, metadata, session)
-        if((len(data['inserts']) +
-                len(data['updates']) +
-                len(data['deletes'])) == 0):
-            print('no data to insert, update, or delete.')
-            return
-        update_old(data, model, session)
-    else:
-        print(f'{model} is not subclass of Dimension')
-    load_data(data, model, metadata, session)
+    compare_data(data, model, metadata, session)
+    session.commit()
+    print(f'{model.__name__} load complete.')
+    print(f'inserted {metadata.inserts} and updated {metadata.updates}')
+    print(f'see load_metadata table, load_id: {metadata.load_id}')
 
 
 def main():
-    session = get_session(db='bikeshare.db')
-    etl(Station_Information, session)
+    session = get_session(env="DEV")
     etl(System_Region, session)
+    etl(Station_Information, session)
     session.close()
-    # etl('station_status')
 
 
 if __name__ == '__main__':

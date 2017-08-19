@@ -8,12 +8,6 @@ from sqlalchemy.orm.session import Session
 
 from src.utils import get_session
 
-###############
-#   Globals   #
-###############
-
-DATABASE = 'test.db'
-
 #############
 #   Tests   #
 #############
@@ -22,7 +16,7 @@ DATABASE = 'test.db'
 class UtilsTestCase(unittest.TestCase):
 
     def test_get_session_returns_Session(self):
-        self.assertIsInstance(get_session(DATABASE), Session)
+        self.assertIsInstance(get_session(env='TST'), Session)
 
 
 if __name__ == '__main__':

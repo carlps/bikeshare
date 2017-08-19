@@ -11,11 +11,11 @@ from ..models import Station_Status, Load_Metadata
 
 
 def get_engine():
-    pg_user = environ['POSTGRES_USER']
-    pg_pw = environ['POSTGRES_PW']
+    pg_user = environ['POSTGRES_USER_TST']
+    pg_pw = environ['POSTGRES_PW_TST']
     host = 'localhost'
     port = '5432'
-    db = 'bikeshare'
+    db = 'bikeshare_tst'
 
     return create_engine(f'postgres://{pg_user}:{pg_pw}@{host}:{port}/{db}')
 
