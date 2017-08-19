@@ -44,6 +44,27 @@ def get_data_from_api():
     return response.json()
 
 
+def get_changed_data(new_data, latest_data):
+    ''' Compare new data (generally from API) against latest data
+        (generally from DB). New data should be a dict with at least keys
+        'data' and 'last_updated'. latest_data should be list of Station_Status
+        objects.
+        For each row in new data, append to output list if:
+        A) Is not already in latest data (ie a new record). Also add to latest
+        B) Is already in latest data, but has a changed value (ie update)
+        Returns list with Station_Status objects to insert
+        into DB as well as updated latest_data list
+    '''
+    out = []
+    for new_row in new_data['data']['stations']:
+        new_row['last_updated'] = new_data['last_updated']
+        new_obj = Station_Status(new_row)
+        if row_is_new(new_obj, latest_data):
+            out.append(new_obj)
+            latest_data[new_obj.station_id] = new_obj
+    return out, latest_data
+
+
 def row_is_new(new_obj, latest_data):
     ''' Check if Station_Status is already in latest data
         If no, it's new!
@@ -77,15 +98,9 @@ def station_status_cdc(session):
     latest_data = get_latest_from_db(session)
     while True:  # loop until ^C pressed
         try:
-            out = []
             new_data = get_data_from_api()
             print(f'got data for {new_data["last_updated"]} at {time():.2f}')
-            for new_row in new_data['data']['stations']:
-                new_row['last_updated'] = new_data['last_updated']
-                new_obj = Station_Status(new_row)
-                if row_is_new(new_obj, latest_data):
-                    out.append(new_obj)
-                    latest_data[new_obj.station_id] = new_obj
+            out, latest_data = get_changed_data(new_data, latest_data)
             if len(out) > 0:
                 load_db(out, session)
                 print(f'inserted {len(out)} rows at '
