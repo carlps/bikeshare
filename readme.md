@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/carlps/bikeshare.svg?branch=master)](https://travis-ci.org/carlps/bikeshare)
 # Bikeshare Data
 This repository currently contains the source for an ETL/CDC pipeline for Capital Bikeshare data. Data is pulled from the Bikeshare API, and loaded into a Postgres database. The database is currently made up of two dimension tables and one fact table. The dimensions are very slow changing, so are batch loaded twice a day. The fact table is generally updated in ten second intervals, so it is loaded with a streaming CDC process.
 
