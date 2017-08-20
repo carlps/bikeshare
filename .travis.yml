@@ -2,7 +2,7 @@ language: python
 python:
   - '3.6'
 intall: pip install -r requirements.txt
-script: nosetests
+script: nosetests -v
 services: postgresql
 before_script:
     - psql -c 'CREATE DATABASE bikeshare_tst;' -U postgres
