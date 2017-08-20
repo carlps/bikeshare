@@ -6,8 +6,8 @@ script: nosetests
 services: postgresql
 before_script:
     - psql -c 'CREATE DATABASE bikeshare_tst;' -U postgres
-    - psql -c "CREATE USER bikeshare_tst WITH PASSWORD 'asdf4321'" -U postgres
-    - psql -c "CREATE USER test_user WITH PASSWORD 'asdf4321'" -U postgres
+    - psql -c "CREATE USER bikeshare_tst WITH PASSWORD 'asdf4321';" -U postgres
+    - psql -c "CREATE USER test_user WITH PASSWORD 'asdf4321';" -U postgres
 addons:
     postgresql: "9.6"
 env:
