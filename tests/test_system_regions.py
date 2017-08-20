@@ -210,8 +210,8 @@ class SystemRegionTestCase(unittest.TestCase):
         self.assertNotEqual(r1, r2)
 
     def test_update_captures_username(self):
-        ''' When a db record is updated,
-            modified_by should be changed to show who it was'''
+        ''' Regions - When a db record is updated, modified_by should be
+            changed to show who it was'''
         # run a load (as bikeshare_tst)
         session = get_session(env='TST', echo=True)
         etl(System_Region, session)
