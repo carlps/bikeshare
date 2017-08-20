@@ -22,6 +22,7 @@ from src.db.create_db_tst import create_db, drop_all_tables
 ##########################
 
 def setUp():
+    drop_all_tables()  # ensure everything is empty
     create_db()
     session = get_session(env='TST', echo=True)
     # load to satisfy fk constraints
