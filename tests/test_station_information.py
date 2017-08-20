@@ -9,6 +9,7 @@ import psycopg2
 from src.bikeshare_etl import get_data, compare_data, etl
 from src.models import Load_Metadata, System_Region, Station_Information
 from src.utils import get_session
+from src.db.create_db_tst import create_db, drop_all_tables
 
 
 ##########################
@@ -16,8 +17,8 @@ from src.utils import get_session
 ##########################
 
 def setUp():
+    create_db()
     session = get_session(env='TST', echo=True)
-    empty_db(session)
     load_regions(session)
     # load one dummy region with region_id 9999
     load_single_region(create_dummy_region(), session)
@@ -25,9 +26,7 @@ def setUp():
 
 
 def tearDown():
-    session = get_session(env='TST', echo=True)
-    empty_db(session)
-    session.close()
+    drop_all_tables()
 
 
 ########################

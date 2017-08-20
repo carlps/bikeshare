@@ -9,6 +9,7 @@ import psycopg2
 from src.bikeshare_etl import get_data, compare_data, etl
 from src.models import Load_Metadata, System_Region
 from src.utils import get_session
+from src.db.create_db_tst import create_db, drop_all_tables
 
 
 ##########################
@@ -16,15 +17,13 @@ from src.utils import get_session
 ##########################
 
 def setUp():
+    create_db()
     session = get_session(env='TST', echo=True)
-    empty_db(session)
     session.close()
 
 
 def tearDown():
-    session = get_session(env='TST', echo=True)
-    empty_db(session)
-    session.close()
+    drop_all_tables()
 
 
 ########################
