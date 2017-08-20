@@ -1,4 +1,4 @@
-﻿CREATE FUNCTION update_user_load_metadata() RETURNS trigger AS $update_user_load_metadata$
+CREATE OR REPLACE FUNCTION update_user_load_metadata() RETURNS trigger AS $update_user_load_metadata$
 	BEGIN
 		-- check is row was midified by a different user
 		IF (new.modified_by != current_user) THEN
@@ -14,7 +14,7 @@ CREATE TRIGGER load_metadata_user
 AFTER UPDATE ON load_metadata
 	FOR EACH ROW EXECUTE PROCEDURE update_user_load_metadata();
 
-CREATE FUNCTION update_user_system_regions() RETURNS trigger AS $update_user_system_regions$
+CREATE OR REPLACE FUNCTION update_user_system_regions() RETURNS trigger AS $update_user_system_regions$
 	BEGIN
 		-- check is row was midified by a different user
 		IF (new.modified_by != current_user) THEN
@@ -30,7 +30,7 @@ CREATE TRIGGER system_regions_user_update
 AFTER UPDATE ON system_regions
 	FOR EACH ROW EXECUTE PROCEDURE update_user_system_regions();
 
-CREATE FUNCTION update_user_station_information() RETURNS trigger AS $update_user_station_information$
+CREATE OR REPLACE FUNCTION update_user_station_information() RETURNS trigger AS $update_user_station_information$
 	BEGIN
 		-- check is row was midified by a different user
 		IF (new.modified_by != current_user) THEN
@@ -45,4 +45,3 @@ $update_user_station_information$ LANGUAGE plpgsql;
 CREATE TRIGGER station_information_user_update
 AFTER UPDATE ON station_information
 	FOR EACH ROW EXECUTE PROCEDURE update_user_station_information();
-

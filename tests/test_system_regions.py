@@ -9,6 +9,7 @@ import psycopg2
 from src.bikeshare_etl import get_data, compare_data, etl
 from src.models import Load_Metadata, System_Region
 from src.utils import get_session
+from src.db.create_db_tst import create_db, drop_all_tables
 
 
 ##########################
@@ -16,15 +17,14 @@ from src.utils import get_session
 ##########################
 
 def setUp():
+    drop_all_tables()  # ensure everything is empty
+    create_db()
     session = get_session(env='TST', echo=True)
-    empty_db(session)
     session.close()
 
 
 def tearDown():
-    session = get_session(env='TST', echo=True)
-    empty_db(session)
-    session.close()
+    drop_all_tables()
 
 
 ########################
@@ -210,8 +210,8 @@ class SystemRegionTestCase(unittest.TestCase):
         self.assertNotEqual(r1, r2)
 
     def test_update_captures_username(self):
-        ''' When a db record is updated,
-            modified_by should be changed to show who it was'''
+        ''' Regions - When a db record is updated, modified_by should be
+            changed to show who it was'''
         # run a load (as bikeshare_tst)
         session = get_session(env='TST', echo=True)
         etl(System_Region, session)

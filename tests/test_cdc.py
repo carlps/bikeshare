@@ -14,6 +14,7 @@ from src.bikeshare_etl import etl
 from src.models import Station_Status, Station_Information
 from src.models import System_Region, Load_Metadata
 from src.utils import get_session
+from src.db.create_db_tst import create_db, drop_all_tables
 
 
 ##########################
@@ -21,17 +22,16 @@ from src.utils import get_session
 ##########################
 
 def setUp():
+    drop_all_tables()  # ensure everything is empty
+    create_db()
     session = get_session(env='TST', echo=True)
-    empty_db(session)
     # load to satisfy fk constraints
     load_regions_and_stations(session)
     session.close()
 
 
 def tearDown():
-    session = get_session(env='TST', echo=True)
-    empty_db(session)
-    session.close()
+    drop_all_tables()
 
 
 ########################
