@@ -1,18 +1,20 @@
 TODO
 
+setup.py
+! add prod connections to src
 
-postgres
-    x- reconfig etl
-    x- reconfig cdc
-        -- see if code can be cleant
-        -- check on tstmps
-        -- new tests
-    x- create test db
-        x- new tests lol
+cron for etl
 
-check session in etl tests
+for regions, create bounds
+    -- max and min lat and lng for each station in the region
 
-move get_data to utils?
+front end
+ -- mapbox?
+ -- plot.ly?
+
+twilio
+
+travis CI into AWS
 
 
 
